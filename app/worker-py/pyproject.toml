@@ -1,16 +1,17 @@
 [tool.poetry]
-name = "worker-py"
+name = "worker_py"
 version = "0.1.0"
 description = ""
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
 packages = [
-    { include = "worker-py" }
+    { include = "worker_py" }
 ]
 
 [tool.poetry.dependencies]
 python = ">=3.12"
 protobuf = "^6.30.2"
+minio = "^7.2.15"
 
 [tool.poetry.group.dev.dependencies]
 grpcio-tools = "^1.71.0"

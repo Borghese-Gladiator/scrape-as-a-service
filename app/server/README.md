@@ -8,7 +8,7 @@ Features
 ## Local Setup
 Steps
 - `poetry install`
-- `Invoke-Expression (poetry env activate)`
+- `Invoke-Expression (poetry env activate)` OR `eval $(poetry env activate)`
 - `fastapi dev main.py`
 
 Steps for ProtoBuf
@@ -85,6 +85,42 @@ client = KafkaClient()
 client.enqueue_jobs("job1", "do something", ScrapeTopic.API)
 client.enqueue_jobs("job2", "do something else", ScrapeTopic.WEBDRIVER)
 client.cancel_scrape_job("job2", ScrapeTopic.WEBDRIVER)
+```
+
+MINIO read/write
+```python
+from minio import Minio
+from minio.error import S3Error
+
+# Setup MinIO client
+client = Minio(
+    "localhost:9002",                  # Replace with your MinIO server URL
+    access_key="minioadmin",  # Replace with your access key
+    secret_key="minioadmin",  # Replace with your secret key
+    secure=False                    # False if you're using HTTP
+)
+
+bucket_name = "my-bucket"
+object_name = "hello.txt"
+file_path = "local_hello.txt"
+
+# Ensure bucket exists
+if not client.bucket_exists(bucket_name):
+    client.make_bucket(bucket_name)
+
+# ✅ Upload (write) a file to MinIO
+try:
+    client.fput_object(bucket_name, object_name, file_path)
+    print(f"File '{file_path}' uploaded to bucket '{bucket_name}' as '{object_name}'.")
+except S3Error as err:
+    print("Upload error:", err)
+
+# ✅ Download (read) a file from MinIO
+try:
+    client.fget_object(bucket_name, object_name, "downloaded_" + file_path)
+    print(f"File '{object_name}' downloaded from bucket '{bucket_name}'.")
+except S3Error as err:
+    print("Download error:", err)
 ```
 
 </details>
