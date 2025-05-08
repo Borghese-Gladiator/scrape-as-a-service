@@ -5,10 +5,15 @@ Features
 - start scrape jobs (enqueue jobs in Kafka)
 - reads data from scrape jobs
 
-Local Setup
+## Local Setup
+Steps
 - `poetry install`
 - `Invoke-Expression (poetry env activate)`
 - `fastapi dev main.py`
+
+Steps for ProtoBuf
+- `python -m grpc_tools.protoc -I. --python_out=. scrape_job.proto`
+
 
 <details>
 <summary>Methodology</summary>
