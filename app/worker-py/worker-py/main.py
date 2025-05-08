@@ -1,3 +1,3 @@
-from scrape_pb2 import ScrapeTask
+from worker_py.proto_gen import scrape_task_pb2
 
-task = ScrapeTask(url="https://example.com", method="GET")
+task = scrape_task_pb2.ScrapeTask(url="https://example.com", method="GET")

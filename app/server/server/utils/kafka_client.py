@@ -5,7 +5,7 @@ from kafka import KafkaProducer, KafkaAdminClient as BaseKafkaAdminClient
 from kafka.admin import NewTopic
 
 from server.config import KAFKA_URL, KAFKA_CLIENT_ID, ScrapeTopic
-
+from server.proto_gen import scrape_task_pb2
 
 class KafkaAdminClient(BaseKafkaAdminClient):
     topics = {topic.value for topic in ScrapeTopic}
@@ -25,11 +25,16 @@ class KafkaAdminClient(BaseKafkaAdminClient):
 
 class KafkaClient:
     def __init__(self, broker_url=KAFKA_URL):
-        self.producer = KafkaProducer(bootstrap_servers=broker_url)
+        self.producer = KafkaProducer(
+            bootstrap_servers=broker_url,
+            value_serializer=lambda v: v.SerializeToString() if v else None,
+            key_serializer=lambda k: k.encode('utf-8')
+        )
             
     def enqueue_scrape_job(self, key: str, value: Any, job_type: ScrapeTopic):
         topic = job_type.value
-        self.producer.send(topic, key=key.encode(), value=value.encode())
+        message = scrape_task_pb2.ScrapeTask(**value)
+        self.producer.send(topic, key=key, value=message)
     
     def cancel_scrape_job(self, key: str, job_type: ScrapeTopic):
         topic = job_type.value
