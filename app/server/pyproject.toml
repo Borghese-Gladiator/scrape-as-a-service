@@ -12,9 +12,11 @@ packages = [
 python = ">=3.12"
 fastapi = { version = ">=0.115.11,<0.116.0", extras = ["standard"] }
 kafka-python = "^2.2.4"
+protobuf = "^6.30.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
+grpcio-tools = "^1.71.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
