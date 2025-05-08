@@ -4,8 +4,7 @@ from typing import Any
 from kafka import KafkaProducer, KafkaAdminClient as BaseKafkaAdminClient
 from kafka.admin import NewTopic
 
-from server.config import KAFKA_URL, KAFKA_CLIENT_ID
-from server.utils.constants import ScrapeTopic
+from server.config import KAFKA_URL, KAFKA_CLIENT_ID, ScrapeTopic
 
 
 class KafkaAdminClient(BaseKafkaAdminClient):
