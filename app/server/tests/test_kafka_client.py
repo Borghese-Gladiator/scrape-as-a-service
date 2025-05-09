@@ -1,11 +1,13 @@
 # test_kafka_client.py
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, call
 from kafka.admin import NewTopic
-from server.utils.kafka_client import KafkaAdminClient, KafkaClient
-from server.utils.constants import ScrapeTopic
 from server.config import KAFKA_URL
+from server.utils.constants import ScrapeTopic
+from server.utils.kafka_client import KafkaAdminClient, KafkaClient
+
 
 #======================
 #   KafkaAdminClient
@@ -41,19 +43,43 @@ def test_delete_default_topics(mock_delete_topics):
 #======================
 #   KafkaClient
 #======================
+@pytest.mark.parametrize(
+    "key, value, topic, expected_exception, expected_send_call",
+    [
+        # Test case 1: Valid key, value, and topic
+        ("job1", "do something", ScrapeTopic.API, None, (ScrapeTopic.API.value, b"job1", b"do something")),
+
+        # Test case 2: Empty key
+        ("", "do something", ScrapeTopic.API, None, (ScrapeTopic.API.value, b"", b"do something")),
+
+        # Test case 3: Empty value
+        ("job1", "", ScrapeTopic.API, None, (ScrapeTopic.API.value, b"job1", b"")),
+
+        # Test case 4: Invalid topic
+        ("job1", "do something", "INVALID_TOPIC", ValueError, None),
+
+        # Test case 5: Large payload
+        ("job1", "x" * 10_000_000, ScrapeTopic.API, None, (ScrapeTopic.API.value, b"job1", b"x" * 10_000_000)),
+    ],
+)
 @patch("server.utils.kafka_client.KafkaProducer")
-def test_kafka_client_enqueue_scrape_job(mock_producer_class):
+def test_kafka_client_enqueue_scrape_job(
+    mock_producer_class, key, value, topic, expected_exception, expected_send_call
+):
     mock_producer = MagicMock()
     mock_producer_class.return_value = mock_producer
 
     client = KafkaClient()
-    client.enqueue_scrape_job("job1", "do something", ScrapeTopic.API)
 
-    mock_producer.send.assert_called_once_with(
-        ScrapeTopic.API.value,
-        key=b"job1",
-        value=b"do something"
-    )
+    if expected_exception:
+        with pytest.raises(expected_exception):
+            client.enqueue_scrape_job(key, value, topic)
+        mock_producer.send.assert_not_called()
+    else:
+        client.enqueue_scrape_job(key, value, topic)
+        mock_producer.send.assert_called_once_with(
+            expected_send_call[0], key=expected_send_call[1], value=expected_send_call[2]
+        )
 
 
 @patch("server.utils.kafka_client.KafkaProducer")
