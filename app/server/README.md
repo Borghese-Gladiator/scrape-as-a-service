@@ -9,11 +9,10 @@ Features
 Steps
 - `poetry install`
 - `Invoke-Expression (poetry env activate)` OR `eval $(poetry env activate)`
-- `fastapi dev main.py`
+- `fastapi dev server/main.py`
 
-Steps for ProtoBuf
-- `python -m grpc_tools.protoc -I. --python_out=. scrape_job.proto`
-
+ProtoBuf steps
+- `poetry run python -m grpc_tools.protoc -I="$($PWD)/../../proto" --python_out="$($PWD)/proto_gen" $PROTO_FILE`
 
 <details>
 <summary>Methodology</summary>
@@ -126,3 +125,17 @@ except S3Error as err:
 </details>
 
 </details>
+
+#### Troubleshooting
+Error
+```zsh
+➜  server git:(main) eval $(poetry env activate)
+Discovered shell doesn't have an activator in virtual environment
+```
+Solution
+```
+➜  server git:(main) ✗ poetry env list --full-path
+/Users/timothy.shee/Library/Caches/pypoetry/virtualenvs/server-Vld1RlOx-py3.13
+➜  server git:(main) ✗ source /Users/timothy.shee/Library/Caches/pypoetry/virtualenvs/server-Vld1RlOx-py3.13/bin/activate
+(server-py3.13) ➜  server git:(main) ✗
+```

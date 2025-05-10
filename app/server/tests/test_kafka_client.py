@@ -73,10 +73,10 @@ def test_kafka_client_enqueue_scrape_job(
 
     if expected_exception:
         with pytest.raises(expected_exception):
-            client.enqueue_scrape_job(key, value, topic)
+            client.enqueue_scrape_task(key, value, topic)
         mock_producer.send.assert_not_called()
     else:
-        client.enqueue_scrape_job(key, value, topic)
+        client.enqueue_scrape_task(key, value, topic)
         mock_producer.send.assert_called_once_with(
             expected_send_call[0], key=expected_send_call[1], value=expected_send_call[2]
         )
@@ -88,7 +88,7 @@ def test_kafka_client_cancel_scrape_job(mock_producer_class):
     mock_producer_class.return_value = mock_producer
 
     client = KafkaClient()
-    client.cancel_scrape_job("job2", ScrapeTopic.WEBDRIVER)
+    client.cancel_scrape_topic("job2", ScrapeTopic.WEBDRIVER)
 
     mock_producer.send.assert_called_once_with(ScrapeTopic.WEBDRIVER.value, key="job2", value=None)
     mock_producer.flush.assert_called_once()

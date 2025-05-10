@@ -1,11 +1,14 @@
 # kafka_app/kafka_client.py
 
 from typing import Any
-from kafka import KafkaProducer, KafkaAdminClient as BaseKafkaAdminClient
-from kafka.admin import NewTopic
 
-from server.config import KAFKA_URL, KAFKA_CLIENT_ID, ScrapeTopic
-from server.proto_gen import scrape_task_pb2
+from kafka import KafkaAdminClient as BaseKafkaAdminClient
+from kafka import KafkaProducer
+from kafka.admin import NewTopic
+from proto_gen import scrape_task_pb2
+
+from server.config import KAFKA_CLIENT_ID, KAFKA_URL, ScrapeTopic
+
 
 class KafkaAdminClient(BaseKafkaAdminClient):
     topics = {topic.value for topic in ScrapeTopic}
@@ -31,12 +34,12 @@ class KafkaClient:
             key_serializer=lambda k: k.encode('utf-8')
         )
             
-    def enqueue_scrape_job(self, key: str, value: Any, job_type: ScrapeTopic):
+    def enqueue_scrape_task(self, key: str, value: Any, job_type: ScrapeTopic):
         topic = job_type.value
         message = scrape_task_pb2.ScrapeTask(**value)
         self.producer.send(topic, key=key, value=message)
     
-    def cancel_scrape_job(self, key: str, job_type: ScrapeTopic):
+    def cancel_scrape_topic(self, key: str, job_type: ScrapeTopic):
         topic = job_type.value
         self.producer.send(topic, key=key, value=None)  # tombstone message for cancellation
         self.producer.flush()  # optional: ensure it's sent out immediately

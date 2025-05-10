@@ -15,7 +15,7 @@ KAFKA_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent.parent / "conf
 
 with open(KAFKA_CONFIG_PATH) as f:
     kafka_topics = json.load(f)
-KAFKA_TOPIC_MAP = kafka_topics["SCRAPE_TASKS_TOPIC"]
+KAFKA_TOPIC_MAP = kafka_topics
 
 class ScrapeTopic(Enum):
     API = KAFKA_TOPIC_MAP["SCRAPE_API_TOPIC"]
