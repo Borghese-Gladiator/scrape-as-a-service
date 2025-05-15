@@ -14,10 +14,12 @@ fastapi = { version = ">=0.115.11,<0.116.0", extras = ["standard"] }
 kafka-python = "^2.2.4"
 protobuf = "^6.30.2"
 minio = "^7.2.15"
+redis = "^6.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
 grpcio-tools = "^1.71.0"
+fakeredis = { version = "^2.29.0", python = ">=3.12,<4.0" }   # This tells Poetry: "Only install fakeredis when Python is between 3.12 and less than 4.0."
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

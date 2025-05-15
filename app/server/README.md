@@ -122,6 +122,32 @@ except S3Error as err:
     print("Download error:", err)
 ```
 
+Redis read/write
+```python
+from server.utils.redis_client import RedisClient
+
+client = RedisClient()
+
+# QUEUE
+task = {"task_id": "abc123", "url": "https://example.com"}
+client.enqueue("my:queue", task)
+print("Dequeued:", client.dequeue("my:queue"))
+
+# SORTED SET
+result = {"task_id": "abc123", "result": "s3://mybucket/result.json"}
+client.zadd("my:results", result)
+print("Recent results:", client.zrange("my:results", 0, 5, desc=True))
+
+# STREAM
+client.stream_create_consumer_group("my:stream", "workers")
+client.stream_add("my:stream", {"task_id": "xyz456", "url": "https://stream.com"})
+message = client.stream_read("my:stream", "workers", "worker-1")
+if message:
+    msg_id, data = message
+    print("Stream task:", data)
+    client.stream_ack("my:stream", "workers", msg_id)
+```
+
 </details>
 
 </details>
