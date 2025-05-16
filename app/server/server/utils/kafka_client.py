@@ -31,8 +31,14 @@ class KafkaClient:
     def __init__(self, broker_url=KAFKA_URL):
         self.producer = KafkaProducer(
             bootstrap_servers=broker_url,
+            
+            # Serializes for ProtoBuf
             value_serializer=lambda v: v.SerializeToString() if v else None,
-            key_serializer=lambda k: k.encode('utf-8')
+            
+            # For null keys, Kafka uses round-robin partitioning
+            # and distributes messages evenly across all partitions.
+            # However, there is no ordering guarantee (not needed for my scraping)
+            key_serializer=lambda k: k.encode('utf-8') if k else None
         )
     
     def ping(self) -> bool:
@@ -49,8 +55,8 @@ class KafkaClient:
             return False
             
     def enqueue(self, topic: str, key: str, value: Any):
-        message = scrape_task_pb2.ScrapeTask(**value)
-        self.producer.send(topic, key=key, value=message)
+        proto_scrape_task = scrape_task_pb2.ScrapeTask(**value)
+        self.producer.send(topic, key=key, value=proto_scrape_task)
     
     def cancel(self, topic: str, key: str, scrape_type: ScrapeType):
         self.producer.send(topic, key=key, value=None)  # tombstone message for cancellation

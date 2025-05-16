@@ -148,6 +148,22 @@ if message:
     client.stream_ack("my:stream", "workers", msg_id)
 ```
 
+FastAPI `/scrape`
+- run infrastructure (`docker compose up`) AND run server (`fastapi dev server/main.py`)
+- send request via REST client
+  - `localhost:8000`
+  - body
+    ```json
+    {
+        "url": "https://jsonplaceholder.typicode.com/todos/1",
+        "method": "GET",
+        "headers": {},
+        "params": {},
+        "body": "",
+        "scrape_type": "API"
+    }
+    ```
+
 </details>
 
 </details>

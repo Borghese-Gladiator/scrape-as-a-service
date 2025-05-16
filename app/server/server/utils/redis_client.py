@@ -4,10 +4,22 @@ Redis client for barebones operations
 import json
 import time
 import redis
+from dataclasses import asdict, dataclass
 from typing import Any, Optional
 
 from proto_gen import scrape_task_pb2
 from server.utils.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
+
+@dataclass
+class WrapperForScrapeTask:
+    """
+    Wrapper class for ScrapeTask protobuf message.
+    """
+    job_id: str
+    url: str
+    headers: dict
+    timestamp: int
+    data: Any
 
 class RedisClient:
     def __init__(self):
@@ -91,10 +103,33 @@ class RedisClient:
     # ------------------------------
     # STREAM METHODS
     # ------------------------------
-    def stream_add(self, stream_name: str, item: dict):
+    def stream_add_scrape_task(self, stream_name: str, raw_dict: dict):
+        """
+        Enqueue scrape task into Redis Stream.
+
+        This methods builds a ProtoBuf message and wraps it with a human readable dict.
+        This enables both human readable and machine readable data to be stored in the stream.
+        
+        Machine Readable benefits
+            enables efficient message size
+            structured, versioned data
+        
+        Human Readable benefits
+            easy inspection/debugging (Grafana, Kibana, etc.)
+        """
+        proto_scrape_task = scrape_task_pb2.ScrapeTask(**raw_dict)
+        value = WrapperForScrapeTask(
+            job_id=raw_dict.get("job_id"),
+            url=raw_dict.get("url"),
+            headers=json.dumps(raw_dict.get("headers") or {}),
+            timestamp=int(time.time()),
+            data=proto_scrape_task.SerializeToString()
+        )
+        self.redis.xadd(stream_name, asdict(value))
+        
+    def stream_add(self, stream_name: str, value: dict):
         """Add an item to a stream."""
-        message = scrape_task_pb2.ScrapeTask(**item)
-        self.redis.xadd(stream_name, message)
+        self.redis.xadd(stream_name, value)
 
     def stream_create_consumer_group(self, stream_name: str, group_name: str):
         """Create a consumer group for a stream (if not exists)."""

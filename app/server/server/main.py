@@ -17,19 +17,20 @@ from proto_gen import scrape_task_pb2
 #==================
 # Pydantic models
 
-class UserScrapeAPI(BaseModel):
+class BaseScrape(BaseModel):
     url: str
-    method: HTTPMethodEnum
-    body: str
     headers: dict[str, str]
+    scrape_type: ScrapeType
+
+class UserScrapeAPI(BaseScrape):
+    method: HTTPMethodEnum
+    body: dict[str, str]
     scrape_type: ScrapeType = Field(default=ScrapeType.API)
 
-class UserScrapeHTML(BaseModel):
-    url: str
-    headers: dict[str, str]
+class UserScrapeHTML(BaseScrape):
     scrape_type: ScrapeType = Field(default=ScrapeType.HTML)
 
-class UserScrapeWebdriver(BaseModel):
+class UserScrapeWebdriver(BaseScrape):
     url: str
     headers: dict[str, str]
     scrape_type: ScrapeType = Field(default=ScrapeType.WEBDRIVER)
@@ -46,10 +47,12 @@ def enqueue(scrape_input: UserScrapeAPI | UserScrapeHTML | UserScrapeWebdriver):
     job_id = uuid7str()
     topic = get_kafka_topic_input(scrape_input.scrape_type)
     channel = get_redis_channel_input(scrape_input.scrape_type)
+    print("START")
 
     # Build payload
     value = scrape_input.model_dump()
     value["job_id"] = job_id
+    del value["scrape_type"]
     
     try:
         kafka_client.enqueue(
@@ -57,9 +60,9 @@ def enqueue(scrape_input: UserScrapeAPI | UserScrapeHTML | UserScrapeWebdriver):
             key=None,
             value=value,
         )
-        redis_client.stream_add(
+        redis_client.stream_add_scrape_task(
             channel,
-            value,
+            raw_dict=value,
         )
         return {
             "job_id": job_id,
@@ -68,9 +71,10 @@ def enqueue(scrape_input: UserScrapeAPI | UserScrapeHTML | UserScrapeWebdriver):
             "channel": channel,
             "scrape_type": scrape_input.scrape_type,
         }
+    except TypeError as e:
+        raise HTTPException(status_code=400, detail=f"ERROR: Failed to Serialize to ProtoBuf for passed event: {str(value)}")
     except Exception as e:
-        return {"error": str(e)}
-
+        raise HTTPException(status_code=500, detail=f"ERROR: {str(e)}")
 
 @app.get("/poll/{job_id}")
 def status(job_id: str):
