@@ -3,6 +3,9 @@ import Long = require("long");
 /** Properties of a ScrapeTask. */
 export interface IScrapeTask {
 
+    /** ScrapeTask jobId */
+    jobId?: (string|null);
+
     /** ScrapeTask url */
     url?: (string|null);
 
@@ -27,6 +30,9 @@ export class ScrapeTask implements IScrapeTask {
      * @param [properties] Properties to set
      */
     constructor(properties?: IScrapeTask);
+
+    /** ScrapeTask jobId. */
+    public jobId: string;
 
     /** ScrapeTask url. */
     public url: string;

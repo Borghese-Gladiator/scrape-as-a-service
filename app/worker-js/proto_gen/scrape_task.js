@@ -15,6 +15,7 @@ $root.ScrapeTask = (function() {
      * Properties of a ScrapeTask.
      * @exports IScrapeTask
      * @interface IScrapeTask
+     * @property {string|null} [jobId] ScrapeTask jobId
      * @property {string|null} [url] ScrapeTask url
      * @property {string|null} [method] ScrapeTask method
      * @property {Object.<string,string>|null} [headers] ScrapeTask headers
@@ -38,6 +39,14 @@ $root.ScrapeTask = (function() {
                 if (properties[keys[i]] != null)
                     this[keys[i]] = properties[keys[i]];
     }
+
+    /**
+     * ScrapeTask jobId.
+     * @member {string} jobId
+     * @memberof ScrapeTask
+     * @instance
+     */
+    ScrapeTask.prototype.jobId = "";
 
     /**
      * ScrapeTask url.
@@ -103,18 +112,20 @@ $root.ScrapeTask = (function() {
     ScrapeTask.encode = function encode(message, writer) {
         if (!writer)
             writer = $Writer.create();
+        if (message.jobId != null && Object.hasOwnProperty.call(message, "jobId"))
+            writer.uint32(/* id 1, wireType 2 =*/10).string(message.jobId);
         if (message.url != null && Object.hasOwnProperty.call(message, "url"))
-            writer.uint32(/* id 1, wireType 2 =*/10).string(message.url);
+            writer.uint32(/* id 2, wireType 2 =*/18).string(message.url);
         if (message.method != null && Object.hasOwnProperty.call(message, "method"))
-            writer.uint32(/* id 2, wireType 2 =*/18).string(message.method);
+            writer.uint32(/* id 3, wireType 2 =*/26).string(message.method);
         if (message.headers != null && Object.hasOwnProperty.call(message, "headers"))
             for (var keys = Object.keys(message.headers), i = 0; i < keys.length; ++i)
-                writer.uint32(/* id 3, wireType 2 =*/26).fork().uint32(/* id 1, wireType 2 =*/10).string(keys[i]).uint32(/* id 2, wireType 2 =*/18).string(message.headers[keys[i]]).ldelim();
+                writer.uint32(/* id 4, wireType 2 =*/34).fork().uint32(/* id 1, wireType 2 =*/10).string(keys[i]).uint32(/* id 2, wireType 2 =*/18).string(message.headers[keys[i]]).ldelim();
         if (message.params != null && Object.hasOwnProperty.call(message, "params"))
             for (var keys = Object.keys(message.params), i = 0; i < keys.length; ++i)
-                writer.uint32(/* id 4, wireType 2 =*/34).fork().uint32(/* id 1, wireType 2 =*/10).string(keys[i]).uint32(/* id 2, wireType 2 =*/18).string(message.params[keys[i]]).ldelim();
+                writer.uint32(/* id 5, wireType 2 =*/42).fork().uint32(/* id 1, wireType 2 =*/10).string(keys[i]).uint32(/* id 2, wireType 2 =*/18).string(message.params[keys[i]]).ldelim();
         if (message.body != null && Object.hasOwnProperty.call(message, "body"))
-            writer.uint32(/* id 5, wireType 2 =*/42).string(message.body);
+            writer.uint32(/* id 6, wireType 2 =*/50).string(message.body);
         return writer;
     };
 
@@ -150,14 +161,18 @@ $root.ScrapeTask = (function() {
             var tag = reader.uint32();
             switch (tag >>> 3) {
             case 1: {
-                    message.url = reader.string();
+                    message.jobId = reader.string();
                     break;
                 }
             case 2: {
-                    message.method = reader.string();
+                    message.url = reader.string();
                     break;
                 }
             case 3: {
+                    message.method = reader.string();
+                    break;
+                }
+            case 4: {
                     if (message.headers === $util.emptyObject)
                         message.headers = {};
                     var end2 = reader.uint32() + reader.pos;
@@ -180,7 +195,7 @@ $root.ScrapeTask = (function() {
                     message.headers[key] = value;
                     break;
                 }
-            case 4: {
+            case 5: {
                     if (message.params === $util.emptyObject)
                         message.params = {};
                     var end2 = reader.uint32() + reader.pos;
@@ -203,7 +218,7 @@ $root.ScrapeTask = (function() {
                     message.params[key] = value;
                     break;
                 }
-            case 5: {
+            case 6: {
                     message.body = reader.string();
                     break;
                 }
@@ -242,6 +257,9 @@ $root.ScrapeTask = (function() {
     ScrapeTask.verify = function verify(message) {
         if (typeof message !== "object" || message === null)
             return "object expected";
+        if (message.jobId != null && message.hasOwnProperty("jobId"))
+            if (!$util.isString(message.jobId))
+                return "jobId: string expected";
         if (message.url != null && message.hasOwnProperty("url"))
             if (!$util.isString(message.url))
                 return "url: string expected";
@@ -282,6 +300,8 @@ $root.ScrapeTask = (function() {
         if (object instanceof $root.ScrapeTask)
             return object;
         var message = new $root.ScrapeTask();
+        if (object.jobId != null)
+            message.jobId = String(object.jobId);
         if (object.url != null)
             message.url = String(object.url);
         if (object.method != null)
@@ -323,10 +343,13 @@ $root.ScrapeTask = (function() {
             object.params = {};
         }
         if (options.defaults) {
+            object.jobId = "";
             object.url = "";
             object.method = "";
             object.body = "";
         }
+        if (message.jobId != null && message.hasOwnProperty("jobId"))
+            object.jobId = message.jobId;
         if (message.url != null && message.hasOwnProperty("url"))
             object.url = message.url;
         if (message.method != null && message.hasOwnProperty("method"))
