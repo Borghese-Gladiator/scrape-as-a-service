@@ -12,8 +12,11 @@ export interface IScrapeTask {
     /** ScrapeTask headers */
     headers?: ({ [k: string]: string }|null);
 
-    /** ScrapeTask scrapeType */
-    scrapeType?: (string|null);
+    /** ScrapeTask params */
+    params?: ({ [k: string]: string }|null);
+
+    /** ScrapeTask body */
+    body?: (string|null);
 }
 
 /** Represents a ScrapeTask. */
@@ -34,8 +37,11 @@ export class ScrapeTask implements IScrapeTask {
     /** ScrapeTask headers. */
     public headers: { [k: string]: string };
 
-    /** ScrapeTask scrapeType. */
-    public scrapeType: string;
+    /** ScrapeTask params. */
+    public params: { [k: string]: string };
+
+    /** ScrapeTask body. */
+    public body: string;
 
     /**
      * Creates a new ScrapeTask instance using the specified properties.

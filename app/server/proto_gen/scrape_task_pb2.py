@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11scrape_task.proto\"\x99\x01\n\nScrapeTask\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0e\n\x06method\x18\x02 \x01(\t\x12)\n\x07headers\x18\x03 \x03(\x0b\x32\x18.ScrapeTask.HeadersEntry\x12\x13\n\x0bscrape_type\x18\x04 \x01(\t\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11scrape_task.proto\"\xea\x01\n\nScrapeTask\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0e\n\x06method\x18\x02 \x01(\t\x12)\n\x07headers\x18\x03 \x03(\x0b\x32\x18.ScrapeTask.HeadersEntry\x12\'\n\x06params\x18\x04 \x03(\x0b\x32\x17.ScrapeTask.ParamsEntry\x12\x0c\n\x04\x62ody\x18\x05 \x01(\t\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a-\n\x0bParamsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,8 +33,12 @@ if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_SCRAPETASK_HEADERSENTRY']._loaded_options = None
   _globals['_SCRAPETASK_HEADERSENTRY']._serialized_options = b'8\001'
+  _globals['_SCRAPETASK_PARAMSENTRY']._loaded_options = None
+  _globals['_SCRAPETASK_PARAMSENTRY']._serialized_options = b'8\001'
   _globals['_SCRAPETASK']._serialized_start=22
-  _globals['_SCRAPETASK']._serialized_end=175
-  _globals['_SCRAPETASK_HEADERSENTRY']._serialized_start=129
-  _globals['_SCRAPETASK_HEADERSENTRY']._serialized_end=175
+  _globals['_SCRAPETASK']._serialized_end=256
+  _globals['_SCRAPETASK_HEADERSENTRY']._serialized_start=163
+  _globals['_SCRAPETASK_HEADERSENTRY']._serialized_end=209
+  _globals['_SCRAPETASK_PARAMSENTRY']._serialized_start=211
+  _globals['_SCRAPETASK_PARAMSENTRY']._serialized_end=256
 # @@protoc_insertion_point(module_scope)
