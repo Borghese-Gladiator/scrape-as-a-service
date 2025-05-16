@@ -1,5 +1,6 @@
-# kafka_app/kafka_client.py
-
+"""
+Kafka client for barebones operations
+"""
 from typing import Any
 
 from kafka import KafkaAdminClient as BaseKafkaAdminClient
@@ -7,11 +8,11 @@ from kafka import KafkaProducer
 from kafka.admin import NewTopic
 from proto_gen import scrape_task_pb2
 
-from server.config import KAFKA_CLIENT_ID, KAFKA_URL, ScrapeTopic
-
+from .config import KAFKA_CLIENT_ID, KAFKA_URL, KAFKA_TOPIC_MAP
+from .constants import ScrapeType
 
 class KafkaAdminClient(BaseKafkaAdminClient):
-    topics = {topic.value for topic in ScrapeTopic}
+    topics = {topic for topic in KAFKA_TOPIC_MAP.values()}
 
     def __init__(self, **kwargs):
         kwargs.setdefault("bootstrap_servers", KAFKA_URL)
@@ -33,14 +34,25 @@ class KafkaClient:
             value_serializer=lambda v: v.SerializeToString() if v else None,
             key_serializer=lambda k: k.encode('utf-8')
         )
+    
+    def ping(self) -> bool:
+        """
+        Checks if the Kafka server is reachable and responsive.
+
+        Returns:
+            True if Kafka responds to the ping, False otherwise.
+        """
+        try:
+            return self.producer.bootstrap_connected()
+        except Exception as e:
+            print(f"Kafka ping failed: {e}")
+            return False
             
-    def enqueue_scrape_task(self, key: str, value: Any, job_type: ScrapeTopic):
-        topic = job_type.value
+    def enqueue(self, topic: str, key: str, value: Any):
         message = scrape_task_pb2.ScrapeTask(**value)
         self.producer.send(topic, key=key, value=message)
     
-    def cancel_scrape_topic(self, key: str, job_type: ScrapeTopic):
-        topic = job_type.value
+    def cancel(self, topic: str, key: str, scrape_type: ScrapeType):
         self.producer.send(topic, key=key, value=None)  # tombstone message for cancellation
         self.producer.flush()  # optional: ensure it's sent out immediately
 

@@ -1,58 +1,98 @@
+from typing import Any, Dict
+
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import Dict
+from pydantic import BaseModel, Field
+from uuid_extensions import uuid7str
 
-from server.config import ScrapeTopic
+from server.utils.config import (
+    REDIS_CHANNEL_OUTPUT,
+)
+from server.utils.constants import HTTPMethodEnum, ScrapeType, get_kafka_topic_input, get_redis_channel_input
 from server.utils.kafka_client import KafkaClient
-
+from server.utils.redis_client import RedisClient
+from proto_gen import scrape_task_pb2
 
 #==================
 #   UTILS
 #==================
-# Pydantic model
-class KafkaMessage(BaseModel):
-    key: str
-    value: str
-    job_type: ScrapeTopic
+# Pydantic models
+
+class UserScrapeAPI(BaseModel):
+    url: str
+    method: HTTPMethodEnum
+    body: str
+    headers: dict[str, str]
+    scrape_type: ScrapeType = Field(default=ScrapeType.API)
+
+class UserScrapeHTML(BaseModel):
+    url: str
+    headers: dict[str, str]
+    scrape_type: ScrapeType = Field(default=ScrapeType.HTML)
+
+class UserScrapeWebdriver(BaseModel):
+    url: str
+    headers: dict[str, str]
+    scrape_type: ScrapeType = Field(default=ScrapeType.WEBDRIVER)
 
 #==================
 #   CONSTANTS
 #==================
 app = FastAPI()
 kafka_client = KafkaClient()
+redis_client = RedisClient()
 
 @app.get("/scrape")
-def enqueue(message: KafkaMessage):
-    """
-    Enqueues a Scrape Task
-    """
+def enqueue(scrape_input: UserScrapeAPI | UserScrapeHTML | UserScrapeWebdriver):
+    job_id = uuid7str()
+    topic = get_kafka_topic_input(scrape_input.scrape_type)
+    channel = get_redis_channel_input(scrape_input.scrape_type)
+
+    # Build payload
+    value = scrape_input.model_dump()
+    value["job_id"] = job_id
+    
     try:
-        kafka_client.enqueue_scrape_task(
-            key=message.key,
-            value=message.value,
+        kafka_client.enqueue(
+            topic=topic,
+            key=None,
+            value=value,
         )
-        return {"status": "Message produced", "key": message.key, "value": message.value}
+        redis_client.stream_add(
+            channel,
+            value,
+        )
+        return {
+            "job_id": job_id,
+            "message": "Task enqueued",
+            "topic": topic,
+            "channel": channel,
+            "scrape_type": scrape_input.scrape_type,
+        }
     except Exception as e:
         return {"error": str(e)}
-@app.get("/dequeue")
-def dequeue():
+
+
+@app.get("/poll/{job_id}")
+def status(job_id: str):
     """
-    Dequeue a task from the queue.
+    Get status of job and get data if possible
     """
-    return {"message": "Task dequeued"}
-@app.get("/status")
-def status():
-    """
-    Get the status of the queue.
-    """
-    return {"message": "Queue status"}
+    channel = REDIS_CHANNEL_OUTPUT
+    try:
+        redis_message: Any | None = redis_client.search(channel, job_id)
+        if redis_message:
+            return {"message": "Data from Redis", "data": redis_message}
+        return {"message": "Results not yet available"}
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.get("/health")
 def health():
-    """
-    Check the health of the queue.
-    """
-    return {"message": "Queue is healthy"}
-
+    return {
+        "status": "ok",
+        "kafka": f"Is Kafka running and accepting connections? {kafka_client.ping()}",
+        "redis": f"Is Redis running and accepting connections? {redis_client.ping()}",
+    }
 
 """
 SIMPLE EXAMPLE
@@ -106,9 +146,8 @@ def patch_item(item_id: int, item: Item):
     return {"message": "Item partially updated", "item": updated_item}
 
 @app.delete("/items/{item_id}")
-def delete_item(ite+m_id: int):
+def delete_item(item_id: int):
     if item_id not in items:
         raise HTTPException(status_code=404, detail="Item not found")
     deleted_item = items.pop(item_id)
     return {"message": "Item deleted", "item": deleted_item}
-

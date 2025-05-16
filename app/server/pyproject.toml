@@ -15,6 +15,7 @@ kafka-python = "^2.2.4"
 protobuf = "^6.30.2"
 minio = "^7.2.15"
 redis = "^6.1.0"
+uuid7 = "^0.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"

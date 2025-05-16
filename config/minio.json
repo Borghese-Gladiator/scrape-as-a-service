@@ -1,3 +1,7 @@
 {
-  "BUCKET_NAME": "scraped-data"
+  "BUCKET_NAME": "scraped-data",
+  "MINIO_ENDPOINT": "localhost:9000",
+  "MINIO_ACCESS_KEY": "minioadmin",
+  "MINIO_SECRET_KEY": "minioadmin",
+  "MINIO_SECURE": false
 }

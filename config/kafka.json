@@ -1,0 +1,12 @@
+{
+    "TOPIC_MAP": {
+        "API": "scrape.input.api",
+        "HTML": "scrape.input.browser.html",
+        "WEBDRIVER": "scrape.input.browser.webdriver"
+    },
+    "BROKER": {
+        "HOST": "localhost",
+        "PORT": 9092
+    },
+    "CLIENT_ID": "scrape-api-client"
+}

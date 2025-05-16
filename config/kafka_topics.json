@@ -1,5 +1,0 @@
-{
-    "SCRAPE_API_TOPIC": "scrape.api.requests",
-    "SCRAPE_WEBDRIVER_TOPIC": "scrape.browser.webdriver",
-    "SCRAPE_HTML_TOPIC": "scrape.browser.html"
-}

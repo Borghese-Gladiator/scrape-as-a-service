@@ -1,0 +1,12 @@
+{
+  "REDIS_HOST": "localhost",
+  "REDIS_PORT": 6379,
+  "REDIS_PASSWORD": "",
+  "REDIS_URL": "redis://localhost:6379/0",
+  "CHANNEL_MAP_INPUT": {
+      "API": "scrape.input.api",
+      "HTML": "scrape.input.browser.html",
+      "WEBDRIVER": "scrape.input.browser.webdriver"
+  },
+  "CHANNEL_OUTPUT": "scrape.output"
+}

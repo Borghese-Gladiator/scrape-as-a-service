@@ -1,12 +1,34 @@
+"""
+Redis client for barebones operations
+"""
 import json
 import time
 import redis
-from typing import Optional
+from typing import Any, Optional
 
+from proto_gen import scrape_task_pb2
+from server.utils.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
 
 class RedisClient:
-    def __init__(self, host="localhost", port=6379):
-        self.redis = redis.Redis(host=host, port=port, decode_responses=True)
+    def __init__(self):
+        self.redis = redis.Redis(
+            host=REDIS_HOST,
+            port=REDIS_PORT,
+            password=REDIS_PASSWORD,
+            decode_responses=True
+        )
+
+    def ping(self) -> bool:
+        """
+        Checks if the Redis server is reachable and responsive.
+
+        Returns:
+            True if Redis responds to the ping, False otherwise.
+        """
+        try:
+            return self.client.ping()
+        except redis.ConnectionError:
+            return False
 
     # ------------------------------
     # QUEUE METHODS (LISTS)
@@ -41,12 +63,38 @@ class RedisClient:
         """Remove a specific item from a sorted set."""
         self.redis.zrem(set_name, json.dumps(item))
 
+    def search(self, set_name: str, job_id: str) -> Any | None:
+        """
+        Searches a Redis sorted set for a message that matches the given job_id.
+
+        Args:
+            set_name: The Redis sorted set key name.
+            job_id: The job_id string to look for.
+
+        Returns:
+            The decoded message (protobuf object) if found, else None.
+        """
+        # ZRANGE returns full range; adjust for paging in production if needed
+        members = self.client.zrange(set_name, 0, -1)
+
+        for raw in members:
+            try:
+                msg = scrape_task_pb2.ScrapeTask.FromString(raw)
+                if msg.job_id == job_id:
+                    return msg
+            except Exception as e:
+                continue  # Skip if not a valid ScrapeTask
+
+        return None
+
+
     # ------------------------------
     # STREAM METHODS
     # ------------------------------
     def stream_add(self, stream_name: str, item: dict):
         """Add an item to a stream."""
-        self.redis.xadd(stream_name, item)
+        message = scrape_task_pb2.ScrapeTask(**item)
+        self.redis.xadd(stream_name, message)
 
     def stream_create_consumer_group(self, stream_name: str, group_name: str):
         """Create a consumer group for a stream (if not exists)."""
