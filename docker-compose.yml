@@ -33,7 +33,7 @@ services:
     restart: always
     ports:
       # Minio also uses 9000 by default
-      - "9003:9003"
+      - "9000:9000"
     environment:
       KAFKA_BROKERCONNECT: kafka:29092
     networks:
@@ -67,8 +67,8 @@ services:
     image: minio/minio
     container_name: minio
     ports:
-      - "9000:9000"  # API
-      - "9001:9001"  # Console
+      - "9002:9002"  # API
+      - "9003:9003"  # Console
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
