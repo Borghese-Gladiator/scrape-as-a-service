@@ -6,7 +6,7 @@ import pytest
 from kafka.admin import NewTopic
 from server.config import KAFKA_URL
 from server.utils.constants import ScrapeTopic
-from server.utils.kafka_client import KafkaAdminClient, KafkaClient
+from server.clients.kafka_client import KafkaAdminClient, KafkaClient
 
 
 #======================
@@ -20,7 +20,7 @@ def test_kafka_admin_client_init(mock_super_init):
         client_id="my-server-admin"
     )
 
-@patch("server.utils.kafka_client.BaseKafkaAdminClient.create_topics")
+@patch("server.clients.kafka_client.BaseKafkaAdminClient.create_topics")
 def test_create_default_topics(mock_create_topics):
     client = KafkaAdminClient()
     client.create_default_topics()
@@ -33,7 +33,7 @@ def test_create_default_topics(mock_create_topics):
     assert {t.name for t in actual_args} == {t.name for t in expected_topics}
 
 
-@patch("server.utils.kafka_client.BaseKafkaAdminClient.delete_topics")
+@patch("server.clients.kafka_client.BaseKafkaAdminClient.delete_topics")
 def test_delete_default_topics(mock_delete_topics):
     client = KafkaAdminClient()
     client.delete_default_topics()
@@ -62,7 +62,7 @@ def test_delete_default_topics(mock_delete_topics):
         ("job1", "x" * 10_000_000, ScrapeTopic.API, None, (ScrapeTopic.API.value, b"job1", b"x" * 10_000_000)),
     ],
 )
-@patch("server.utils.kafka_client.KafkaProducer")
+@patch("server.clients.kafka_client.KafkaProducer")
 def test_kafka_client_enqueue_scrape_job(
     mock_producer_class, key, value, topic, expected_exception, expected_send_call
 ):
@@ -82,7 +82,7 @@ def test_kafka_client_enqueue_scrape_job(
         )
 
 
-@patch("server.utils.kafka_client.KafkaProducer")
+@patch("server.clients.kafka_client.KafkaProducer")
 def test_kafka_client_cancel_scrape_job(mock_producer_class):
     mock_producer = MagicMock()
     mock_producer_class.return_value = mock_producer

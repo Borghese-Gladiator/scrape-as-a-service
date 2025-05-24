@@ -4,7 +4,7 @@ import json
 import time
 from redis.exceptions import ResponseError
 
-from server.utils.redis_client import RedisClient
+from server.clients.redis_client import RedisClient
 
 
 class TestRedisClient:

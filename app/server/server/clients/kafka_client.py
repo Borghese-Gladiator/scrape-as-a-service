@@ -8,8 +8,8 @@ from kafka import KafkaProducer
 from kafka.admin import NewTopic
 from proto_gen import scrape_task_pb2
 
-from .config import KAFKA_CLIENT_ID, KAFKA_URL, KAFKA_TOPIC_MAP
-from .constants import ScrapeType
+from server.utils.config import KAFKA_CLIENT_ID, KAFKA_URL, KAFKA_TOPIC_MAP
+from server.utils.constants import ScrapeType
 
 class KafkaAdminClient(BaseKafkaAdminClient):
     topics = {topic for topic in KAFKA_TOPIC_MAP.values()}
@@ -54,7 +54,7 @@ class KafkaClient:
             print(f"Kafka ping failed: {e}")
             return False
             
-    def enqueue(self, topic: str, key: str, value: Any):
+    def stream(self, topic: str, key: str, value: Any):
         proto_scrape_task = scrape_task_pb2.ScrapeTask(**value)
         self.producer.send(topic, key=key, value=proto_scrape_task)
     

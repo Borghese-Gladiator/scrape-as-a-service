@@ -7,9 +7,9 @@ from uuid_extensions import uuid7str
 from server.utils.config import (
     REDIS_CHANNEL_OUTPUT,
 )
+from server.clients.kafka_client import KafkaClient
+from server.clients.redis_client import RedisClient
 from server.utils.constants import HTTPMethodEnum, ScrapeType, get_kafka_topic_input, get_redis_channel_input
-from server.utils.kafka_client import KafkaClient
-from server.utils.redis_client import RedisClient
 from proto_gen import scrape_task_pb2
 
 #==================
@@ -42,6 +42,9 @@ app = FastAPI()
 kafka_client = KafkaClient()
 redis_client = RedisClient()
 
+#==================
+#   MAIN
+#==================
 @app.get("/scrape")
 def enqueue(scrape_input: UserScrapeAPI | UserScrapeHTML | UserScrapeWebdriver):
     job_id = uuid7str()
@@ -55,7 +58,7 @@ def enqueue(scrape_input: UserScrapeAPI | UserScrapeHTML | UserScrapeWebdriver):
     del value["scrape_type"]
     
     try:
-        kafka_client.enqueue(
+        kafka_client.stream(
             topic=topic,
             key=None,
             value=value,

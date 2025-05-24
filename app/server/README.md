@@ -42,7 +42,7 @@ KAFKA read/write
 #====================
 #   KAFKA package
 #====================
-from server.utils.kafka_client import KafkaAdminClient
+from server.clients.kafka_client import KafkaAdminClient
 from kafka import KafkaAdminClient
 admin_client = KafkaAdminClient(
     bootstrap_servers=KAFKA_URL,
@@ -75,7 +75,7 @@ consumer.close()
 #=========================
 #   KAFKA implementation
 #=========================
-from server.utils.kafka_client import KafkaClient, KafkaAdminClient
+from server.clients.kafka_client import KafkaClient, KafkaAdminClient
 admin_client = KafkaAdminClient()
 admin_client.create_default_topics()
 admin_client.delete_default_topics()
@@ -124,7 +124,7 @@ except S3Error as err:
 
 Redis read/write
 ```python
-from server.utils.redis_client import RedisClient
+from server.clients.redis_client import RedisClient
 
 client = RedisClient()
 
