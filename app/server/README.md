@@ -33,6 +33,9 @@ Features
 - Kafka with ProtoBuf read/write
   - `kafka_client.py`
   - `test_kafka_client.py`
+- Minio read/write
+- Redis read/write
+- protobuf serialize/deserialize
 
 <details>
 <summary>Feature Testing</summary>
@@ -169,7 +172,7 @@ FastAPI `/scrape`
 </details>
 
 #### Troubleshooting
-Error
+Error on MacOS
 ```zsh
 ➜  server git:(main) eval $(poetry env activate)
 Discovered shell doesn't have an activator in virtual environment
