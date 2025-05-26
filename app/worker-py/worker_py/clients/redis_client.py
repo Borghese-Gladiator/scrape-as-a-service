@@ -41,12 +41,16 @@ class RedisClient:
         self.group_name = group_name
         self.consumer_name = consumer_name
         for channel in channel_list:
-            # TODO: figure out how to do this better so I can run multiple workers (this will screw up other workers since it destroys a common resource)
-            self.redis.xgroup_destroy(channel, group_name)
-            
-            # id='0' means Consumer Group will read all messages from the beginning including acknowledged ones
-            # id='$' means Consumer Group will read only new messages
-            self.redis.xgroup_create(name=channel, groupname=group_name, id='$')
+            try:
+                # id='0' means Consumer Group will read all messages from the beginning including acknowledged ones
+                # id='$' means Consumer Group will read only new messages
+                self.redis.xgroup_create(name=channel, groupname=group_name, id='$')
+            except redis.exceptions.ResponseError as e:
+                if "BUSYGROUP" in str(e):
+                    # Consumer group already exists, which is okay
+                    pass
+                else:
+                    raise  # re-raise unexpected exceptions
 
     def ping(self) -> bool:
         """
