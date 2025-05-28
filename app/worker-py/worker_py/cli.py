@@ -5,6 +5,10 @@ import typer
 from worker_py.clients.redis_client import RedisClient
 from worker_py.clients.kafka_client import KafkaClient
 from worker_py.clients.minio_client import MinioClient
+from worker_py.scrapers.base_scraper import BaseScraper
+from worker_py.scrapers.api_scraper import ApiScraper
+from worker_py.scrapers.html_scraper import HtmlScraper
+from worker_py.scrapers.webdriver_scraper import WebdriverScraper
 from worker_py.utils.config import (
     REDIS_CHANNEL_MAP_INPUT,
     KAFKA_TOPIC_MAP,
@@ -48,9 +52,9 @@ def redis_build_scraper_from_channel_name(channel_name) -> BaseScraper:
     Get the scraper type from the Redis channel name. Singleton pattern prevents multiple instances of the same scraper.
     """
     return {
-        REDIS_CHANNEL_MAP_INPUT["API"]: ApiScraper(),
-        REDIS_CHANNEL_MAP_INPUT["HTML"]: HtmlScraper(),
-        REDIS_CHANNEL_MAP_INPUT["WEBDRIVER"]: WebDriverScraper(),
+        REDIS_CHANNEL_MAP_INPUT["API"]: ApiScraper,
+        REDIS_CHANNEL_MAP_INPUT["HTML"]: HtmlScraper,
+        REDIS_CHANNEL_MAP_INPUT["WEBDRIVER"]: WebDriverScraper,
     }[channel_name]
 
 # KAFKA
@@ -59,9 +63,9 @@ def kafka_build_scraper_from_topic_name(topic_name) -> BaseScraper:
     Get the scraper type from the Kafka topic name. Singleton pattern prevents multiple instances of the same scraper.
     """
     return {
-        KAFKA_TOPIC_MAP["API"]: ApiScraper(),
-        KAFKA_TOPIC_MAP["HTML"]: HtmlScraper(),
-        KAFKA_TOPIC_MAP["WEBDRIVER"]: WebDriverScraper(),
+        KAFKA_TOPIC_MAP["API"]: ApiScraper,
+        KAFKA_TOPIC_MAP["HTML"]: HtmlScraper,
+        KAFKA_TOPIC_MAP["WEBDRIVER"]: WebDriverScraper,
     }[topic_name]
 
 
