@@ -1,5 +1,4 @@
 # scrape-as-a-service
-
 Scrape as a Service is a scalable scraping platform for extracting web pages and parsing HTML results into structured data using LLMs.
 
 This platform scales by queueing all scrape jobs into an ingestion pipeline and then scaling the number of workers based on the queue depth.
@@ -84,3 +83,13 @@ To simplify my scrape at scale project, I am using OOP to encapsulate each part.
 In general, the correct logic for my use case is Producer is dumb and simply enqueues URLs. The Consumer has the logic to scrape those URLs and put it back on the failed message queue.
 
 </details>
+
+
+---
+The user provides a natural language prompt, like:
+"Get me all the product names, prices, and reviews from this page"
+
+You use a small/fast model (or toolkit) to identify the relevant HTML sections (e.g., divs, tables, spans)
+
+Then pass only that filtered HTML to a larger model for final structured parsing.
+
