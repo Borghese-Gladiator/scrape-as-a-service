@@ -1,0 +1,23 @@
+{
+  "name": "scraper-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "tsc -b packages/db packages/shared apps/api apps/worker apps/scheduler",
+    "test": "vitest run && npm run test --workspace @scraper/web",
+    "migrate": "npm run migrate --workspace @scraper/db"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
