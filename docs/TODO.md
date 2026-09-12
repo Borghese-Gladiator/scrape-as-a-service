@@ -287,7 +287,7 @@ network trace. Debugging a broken selector means reproducing it by hand.
 
 ## 6. Testing
 
-### 6.1 No integration tests — P1
+### 6.1 No integration tests — P1 — **DONE (phase 8)**
 Every test uses a fake or a mock. `packages/db` tests run against a fake pg
 client, so no SQL in the repository layer is ever executed. A syntax error or a
 column typo in any query passes the whole suite. Nothing runs against real
@@ -296,7 +296,7 @@ Postgres, Redis, or MinIO.
 Fix: add a `--runintegration` style suite with testcontainers or a compose
 fixture, and run every repository query against a real database.
 
-### 6.2 No end-to-end test — P1
+### 6.2 No end-to-end test — P1 — **DONE (phase 8)**
 Nothing exercises create-definition to artifact-download through the running
 stack. The CORS failure in 2.1 is exactly the class of bug an end-to-end test
 catches and unit tests cannot.
@@ -307,7 +307,7 @@ direct test, despite hand-rolled quoting and escaping. `validateScrapeConfig` is
 covered only indirectly through an API route test. `apps/api` route tests cover
 2 of the 4 routers: `schedules` and `artifacts` have none.
 
-### 6.4 No CI — P1
+### 6.4 No CI — P1 — **DONE (phase 8)**
 There is no `.github/workflows` directory and no pipeline configuration of any
 kind. Nothing runs typecheck, lint, or tests on a push.
 
@@ -315,7 +315,7 @@ kind. Nothing runs typecheck, lint, or tests on a push.
 
 ## 7. Build, ops, and developer experience
 
-### 7.1 No lint or format at the root — P2
+### 7.1 No lint or format at the root — P2 — **DONE (phase 8)**
 Only `apps/web` has an eslint config. `packages/*` and the other two apps are
 unlinted. There is no Prettier config, so formatting is by convention only. The
 root `package.json` has no `lint` or `format` script.
@@ -326,17 +326,17 @@ this, but it is a persistent sharp edge. A runtime-configured base URL, fetched
 from a `/config` endpoint or read by a route handler proxy, removes it. Fixing
 2.1 with a Next.js proxy removes this problem as a side effect.
 
-### 7.3 The worker image is not pruned — P2
+### 7.3 The worker image is not pruned — P2 — **DONE (phase 8)**
 `apps/worker/Dockerfile` is single-stage on the Playwright base image. It keeps
 dev dependencies, TypeScript, and all source. The API and scheduler Dockerfiles
 should be checked for the same.
 
-### 7.4 `cron-parser` v4 is deprecated — P2
+### 7.4 `cron-parser` v4 is deprecated — P2 — **DONE (phase 8)**
 `npm ci` warns: "v4 is no longer maintained, upgrade to v5". Only
 `packages/shared/src/cron.ts` uses it, and it has test coverage, so the upgrade
 is cheap.
 
-### 7.5 Playwright browsers are a hidden local prerequisite — P2
+### 7.5 Playwright browsers are a hidden local prerequisite — P2 — **DONE (phase 8)**
 Running the worker outside Docker requires `npx playwright install chromium`.
 The README does not say so.
 
