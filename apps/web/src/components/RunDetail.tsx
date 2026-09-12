@@ -87,6 +87,7 @@ export function RunDetail({
           <table>
             <thead>
               <tr>
+                <th>Name</th>
                 <th>Type</th>
                 <th>Size</th>
                 <th>Download</th>
@@ -95,6 +96,7 @@ export function RunDetail({
             <tbody>
               {run.artifacts.map((artifact) => (
                 <tr key={artifact.id}>
+                  <td>{artifact.name ?? '—'}</td>
                   <td>{artifact.type}</td>
                   <td>{formatBytes(artifact.size_bytes)}</td>
                   <td className="artifact-links">

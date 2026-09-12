@@ -10,7 +10,7 @@ packages/
   shared/   config loader, BullMQ queue, MinIO/S3 storage, cron next-run helper, scrape-config validation
 apps/
   api/        REST service (Express)
-  worker/     BullMQ worker + Playwright scraper
+  worker/     BullMQ worker + Playwright step interpreter
   scheduler/  interval poller enqueuing due schedules
   web/        Next.js frontend
 ```
@@ -87,11 +87,157 @@ API_BASE_URL=http://localhost:54000
 
 Then `docker compose build web && docker compose up -d`.
 
+## Scrape definitions (config v2)
+
+A scrape definition is data, never code. The platform never evaluates
+JavaScript that a user supplies. Every capability is a step verb with a closed
+schema, and `validateScrapeConfig` checks that schema before the API stores the
+definition.
+
+```ts
+interface ScrapeConfig {
+  version: 2;
+  auth?: AuthConfig;   // Phase 4 executes this; the validator accepts it today
+  steps: Step[];
+  limits?: Limits;
+  record?: boolean;    // record the context as one recording.webm artifact
+}
+```
+
+### Step verbs
+
+| Verb | Fields | What it does |
+| --- | --- | --- |
+| `goto` | `url?`, `waitUntil?` | Navigate. With no `url` it uses the definition URL. |
+| `waitFor` | `selector`, `timeoutMs?`, `state?` | Wait for a selector in the current scope. |
+| `click` | `selector`, `opens?`, `timeoutMs?`, `optional?` | Click the first match. `opens: 'newTab'` makes the new tab current. |
+| `fill` | `selector`, `value?` \| `valueFrom?` | Type a literal, or a secret that `valueFrom` names. |
+| `select` | `selector`, `value` | Pick an option. |
+| `press` | `key` | Press a key. |
+| `scroll` | `to`, `selector?` | Scroll to the bottom, or to an element. |
+| `extract` | `name`, `rowSelector?`, `fields`, `emit?` | Read fields into `datasets[name]`. |
+| `capture` | `as`, `name`, `fullPage?` | Capture the page as PNG, PDF, or HTML. |
+| `forEach` | `rowSelector`, `max?`, `steps` | Run nested steps once per row, scoped to that row. |
+| `openLink` | `selector`, `attribute?`, `steps` | Open the link target in a new page, run nested steps, close it. |
+| `paginate` | `nextSelector`, `maxPages`, `steps` | Run nested steps, click next, repeat. |
+| `goBack` | — | Close the current tab, or navigate back. |
+
+`extract` writes one JSON file per dataset at the end of the run, named
+`<name>.json`. It writes `<name>.csv` as well when `emit` holds `CSV`. A
+dataset collects every row from every loop pass, so a paginated table becomes
+one file.
+
+### Artifact names
+
+`capture.name` is a template. It accepts `{{index}}` (the zero-based `forEach`
+counter, stable across pages), `{{page}}` (the one-based `paginate` counter),
+and `{{row.<field>}}` (a field of the most recent `extract` in the same scope).
+There is no expression support. The platform lowercases the result, replaces
+every character outside `[a-z0-9._-]` with `-`, truncates it to 120 characters,
+appends the extension, and suffixes `-2`, `-3` and so on for a repeat.
+
+### Limits
+
+| Limit | Default | Hard cap |
+| --- | --- | --- |
+| `maxDurationMs` | 120000 | 900000 |
+| `maxSteps` | 500 | 10000 |
+| `maxPages` | 50 | 500 |
+| `maxArtifacts` | 200 | 2000 |
+
+The validator clamps a value to the hard cap. The interpreter throws an error
+with code `LIMIT_EXCEEDED` when a run breaks one.
+
+### A worked example
+
+Walk every page of a transactions table. For every row, read the row, open its
+receipt in a new page, and capture that receipt as a PNG and a PDF.
+
+```json
+{
+  "version": 2,
+  "steps": [
+    { "op": "goto" },
+    { "op": "waitFor", "selector": "table tbody tr" },
+    {
+      "op": "paginate",
+      "nextSelector": "a.next",
+      "maxPages": 5,
+      "steps": [
+        {
+          "op": "extract",
+          "name": "rows",
+          "rowSelector": "table tbody tr",
+          "fields": [
+            { "name": "date", "selector": "td.date" },
+            { "name": "amount", "selector": "td.amount" },
+            { "name": "receipt", "selector": "td.receipt-no" }
+          ],
+          "emit": ["JSON", "CSV"]
+        },
+        {
+          "op": "forEach",
+          "rowSelector": "table tbody tr",
+          "steps": [
+            {
+              "op": "extract",
+              "name": "row",
+              "fields": [{ "name": "receipt", "selector": "td.receipt-no" }]
+            },
+            {
+              "op": "openLink",
+              "selector": "a.receipt",
+              "steps": [
+                {
+                  "op": "capture",
+                  "as": ["PNG", "PDF"],
+                  "name": "receipt-p{{page}}-r{{index}}-{{row.receipt}}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+Against a two-page table of three rows each, that definition produces
+`receipt-p1-r0-8dx6t13140.png`, its PDF, four more pairs, `rows.json`,
+`rows.csv`, and `row.json`.
+
+To see it run against a fixture site that the script serves itself:
+
+```bash
+npm run typecheck
+node scripts/manual/phase-2-interpreter.mjs
+```
+
+Run `npx playwright install chromium` first when Chromium is missing.
+
+### The v1 config
+
+A definition that carries no `version` is a v1 config. `POST /definitions`
+upgrades it on write, so a stored config is always v2. The mapping is:
+
+```
+v1 { waitFor, rowSelector, fields, artifacts }
+ -> [ goto, waitFor?, extract(name: 'rows'), capture(name: 'page')? ]
+```
+
+`JSON` and `CSV` in the v1 `artifacts` list serialize the extracted rows, so
+they become `extract.emit`. `PNG` and `HTML` become a capture. `WEBM` becomes
+`record: true`. An upgraded config keeps the v1 filenames: `data.json`,
+`data.csv`, `screenshot.png`, `source.html`, and `recording.webm`.
+
 ## End-to-end walkthrough
 
 1. Open http://localhost:3000 → **New definition**. Give it a name, a reachable
    URL (e.g. `https://example.com`), a row selector / field selectors, and check
-   the **JSON**, **CSV**, and **PNG** artifacts. Create it.
+   the **JSON**, **CSV**, and **PNG** artifacts. Create it. The form still posts
+   a v1 config; the API upgrades it to a v2 step program on write. Phase 7 adds
+   a step editor.
 2. On the definition page click **Run**. Open the run from **Run history**: it
    transitions `QUEUED → RUNNING → SUCCEEDED` with an attempt recorded.
 3. On a `SUCCEEDED` run, download the JSON / CSV / PNG artifacts. Objects live in

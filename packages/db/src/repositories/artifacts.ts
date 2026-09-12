@@ -2,19 +2,22 @@ import type { Queryable } from '../client.js';
 import type { StoragePutResult } from '@scraper/shared';
 import type { Artifact, ArtifactType } from '../types.js';
 
-const COLUMNS = 'id, run_id, type, object_key, content_type, size_bytes, created_at';
+const COLUMNS =
+  'id, run_id, type, name, step_index, object_key, content_type, size_bytes, created_at';
 
 export async function insertArtifact(
   db: Queryable,
   runId: string,
   type: ArtifactType,
   put: StoragePutResult,
+  name: string,
+  stepIndex: number,
 ): Promise<Artifact> {
   const { rows } = await db.query<Artifact>(
-    `INSERT INTO artifacts (run_id, type, object_key, content_type, size_bytes)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO artifacts (run_id, type, name, step_index, object_key, content_type, size_bytes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING ${COLUMNS}`,
-    [runId, type, put.objectKey, put.contentType, put.sizeBytes],
+    [runId, type, name, stepIndex, put.objectKey, put.contentType, put.sizeBytes],
   );
   return rows[0]!;
 }

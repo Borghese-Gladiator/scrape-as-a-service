@@ -52,6 +52,8 @@ export interface Artifact {
   id: string;
   run_id: string;
   type: ArtifactType;
+  name: string | null;
+  step_index: number | null;
   object_key: string;
   content_type: string;
   size_bytes: number;

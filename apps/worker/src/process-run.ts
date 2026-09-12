@@ -8,7 +8,7 @@ import {
   updateRunStatus,
   type Queryable,
 } from '@scraper/db';
-import type { ScrapeJobData, StorageClient } from '@scraper/shared';
+import { validateScrapeConfig, type ScrapeJobData, type StorageClient } from '@scraper/shared';
 import { buildAndUploadArtifacts } from './artifacts.js';
 import { runScrape } from './scrape.js';
 
@@ -72,19 +72,17 @@ export async function processRun(
       throw new Error(`definition not found: ${definitionId}`);
     }
 
+    // A definition stored before Phase 2 still holds a v1 config; upgrade it.
+    const config = validateScrapeConfig(definition.config);
+
     browser = await launchBrowser();
-    const result = await runScrape(browser, definition.url, definition.config);
+    const result = await runScrape(browser, definition.url, config);
     await browser.close();
     browser = undefined;
 
-    const uploaded = await buildAndUploadArtifacts(
-      storage,
-      runId,
-      definition.config,
-      result,
-    );
-    for (const { type, put } of uploaded) {
-      await insertArtifact(pool, runId, type, put);
+    const uploaded = await buildAndUploadArtifacts(storage, runId, config, result);
+    for (const { type, put, name, stepIndex } of uploaded) {
+      await insertArtifact(pool, runId, type, put, name, stepIndex);
     }
 
     await finishAttempt(pool, attempt.id, 'SUCCEEDED');
