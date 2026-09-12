@@ -1,6 +1,12 @@
 export type ArtifactType = 'JSON' | 'CSV' | 'PNG' | 'HTML' | 'WEBM';
 
-export const ARTIFACT_TYPES: readonly ArtifactType[] = ['JSON', 'CSV', 'PNG', 'HTML', 'WEBM'];
+export const ARTIFACT_TYPES: readonly ArtifactType[] = [
+  'JSON',
+  'CSV',
+  'PNG',
+  'HTML',
+  'WEBM',
+];
 
 export interface ScrapeFieldSelector {
   name: string;
@@ -34,7 +40,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isArtifactType(value: unknown): value is ArtifactType {
-  return typeof value === 'string' && (ARTIFACT_TYPES as readonly string[]).includes(value);
+  return (
+    typeof value === 'string' && (ARTIFACT_TYPES as readonly string[]).includes(value)
+  );
 }
 
 /**
@@ -72,7 +80,9 @@ export function validateScrapeConfig(input: unknown): ScrapeConfig {
       throw new ScrapeConfigError(`fields[${index}].selector must be a non-empty string`);
     }
     if (attribute !== undefined && typeof attribute !== 'string') {
-      throw new ScrapeConfigError(`fields[${index}].attribute must be a string when provided`);
+      throw new ScrapeConfigError(
+        `fields[${index}].attribute must be a string when provided`,
+      );
     }
     return attribute === undefined ? { name, selector } : { name, selector, attribute };
   });

@@ -95,17 +95,20 @@ describeIntegration('schedules repository', () => {
     { label: 'due and enabled', enabled: true, offsetMs: -60_000, expected: true },
     { label: 'not yet due', enabled: true, offsetMs: 60_000, expected: false },
     { label: 'due but disabled', enabled: false, offsetMs: -60_000, expected: false },
-  ])('findDueSchedules returns $expected when $label', async ({ enabled, offsetMs, expected }) => {
-    const now = new Date('2026-06-01T12:00:00.000Z');
-    const schedule = await createSchedule(
-      pool,
-      { definitionId, cron: '* * * * *', timezone: 'UTC', enabled },
-      new Date(now.getTime() + offsetMs),
-    );
+  ])(
+    'findDueSchedules returns $expected when $label',
+    async ({ enabled, offsetMs, expected }) => {
+      const now = new Date('2026-06-01T12:00:00.000Z');
+      const schedule = await createSchedule(
+        pool,
+        { definitionId, cron: '* * * * *', timezone: 'UTC', enabled },
+        new Date(now.getTime() + offsetMs),
+      );
 
-    const due = await findDueSchedules(pool, now);
-    expect(due.some((s) => s.id === schedule.id)).toBe(expected);
-  });
+      const due = await findDueSchedules(pool, now);
+      expect(due.some((s) => s.id === schedule.id)).toBe(expected);
+    },
+  );
 
   it('ignores schedules with a null next_run_at', async () => {
     const schedule = await createSchedule(

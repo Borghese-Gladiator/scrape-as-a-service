@@ -41,7 +41,11 @@ class MinioStorageClient implements StorageClient {
     }
   }
 
-  async put(objectKey: string, body: Buffer, contentType: string): Promise<StoragePutResult> {
+  async put(
+    objectKey: string,
+    body: Buffer,
+    contentType: string,
+  ): Promise<StoragePutResult> {
     await this.client.putObject(this.bucket, objectKey, body, body.length, {
       'Content-Type': contentType,
     });

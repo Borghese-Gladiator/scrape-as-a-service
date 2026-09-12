@@ -47,10 +47,7 @@ export async function getRun(db: Queryable, id: string): Promise<ScrapeRun | nul
   return rows[0] ?? null;
 }
 
-export async function getRunDetail(
-  db: Queryable,
-  id: string,
-): Promise<RunDetail | null> {
+export async function getRunDetail(db: Queryable, id: string): Promise<RunDetail | null> {
   const run = await getRun(db, id);
   if (!run) return null;
   const [attempts, artifacts] = await Promise.all([

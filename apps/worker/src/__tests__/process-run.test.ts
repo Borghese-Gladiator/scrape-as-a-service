@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Job } from 'bullmq';
 import type { QueryResult, QueryResultRow } from 'pg';
 import type { Queryable } from '@scraper/db';
-import type { ScrapeConfig, ScrapeJobData, StorageClient, StoragePutResult } from '@scraper/shared';
+import type {
+  ScrapeConfig,
+  ScrapeJobData,
+  StorageClient,
+  StoragePutResult,
+} from '@scraper/shared';
 
 const runScrapeMock = vi.fn();
 vi.mock('../scrape.js', () => ({
@@ -58,7 +63,12 @@ class FakeDb implements Queryable {
       return [attempt];
     }
     if (text.includes('UPDATE scrape_run_attempts')) {
-      const [id, status, code, message] = values as [string, string, string | null, string | null];
+      const [id, status, code, message] = values as [
+        string,
+        string,
+        string | null,
+        string | null,
+      ];
       const attempt = this.attempts.find((a) => a.id === id)!;
       attempt.status = status;
       attempt.error_code = code;
@@ -72,7 +82,15 @@ class FakeDb implements Queryable {
       return [{ id: 'run-1', status, finished_at: this.runFinishedAt } as RunRow];
     }
     if (text.includes('FROM scrape_definitions')) {
-      return [{ id: 'def-1', name: 'd', url: 'https://x', config: DEF_CONFIG, created_at: new Date() }];
+      return [
+        {
+          id: 'def-1',
+          name: 'd',
+          url: 'https://x',
+          config: DEF_CONFIG,
+          created_at: new Date(),
+        },
+      ];
     }
     if (text.includes('INSERT INTO artifacts')) {
       const [, type, objectKey] = values as [string, string, string];
@@ -87,7 +105,11 @@ function fakeStorage(): StorageClient {
   return {
     ensureBucket: vi.fn(async () => {}),
     put: vi.fn(
-      async (objectKey: string, body: Buffer, contentType: string): Promise<StoragePutResult> => ({
+      async (
+        objectKey: string,
+        body: Buffer,
+        contentType: string,
+      ): Promise<StoragePutResult> => ({
         objectKey,
         contentType,
         sizeBytes: body.length,
@@ -132,9 +154,7 @@ describe('processRun success path', () => {
     expect(db.attempts[0]!.attempt_number).toBe(1);
     expect(db.attempts[0]!.status).toBe('SUCCEEDED');
     expect(db.runStatus).toBe('SUCCEEDED');
-    expect(db.artifacts).toEqual([
-      { type: 'JSON', object_key: 'runs/run-1/data.json' },
-    ]);
+    expect(db.artifacts).toEqual([{ type: 'JSON', object_key: 'runs/run-1/data.json' }]);
     expect(browser.close).toHaveBeenCalled();
   });
 });
@@ -143,7 +163,9 @@ describe('processRun failure/retry path', () => {
   it('records error on attempt and does NOT fail the run before retries are exhausted', async () => {
     const db = new FakeDb();
     const browser = fakeBrowser();
-    runScrapeMock.mockRejectedValue(Object.assign(new Error('nav timeout'), { name: 'NAV_TIMEOUT' }));
+    runScrapeMock.mockRejectedValue(
+      Object.assign(new Error('nav timeout'), { name: 'NAV_TIMEOUT' }),
+    );
 
     await expect(
       processRun(fakeJob(0, 3), {

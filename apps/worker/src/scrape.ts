@@ -97,7 +97,11 @@ async function extractRows(
 
   const row: Record<string, string | null> = {};
   for (const field of config.fields) {
-    row[field.name] = await readField(page.locator('body'), field.selector, field.attribute);
+    row[field.name] = await readField(
+      page.locator('body'),
+      field.selector,
+      field.attribute,
+    );
   }
   return [row];
 }

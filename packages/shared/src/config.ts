@@ -54,7 +54,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     apiPort: toInt(optional(env, 'API_PORT', '4000'), 'API_PORT'),
     webPort: toInt(optional(env, 'WEB_PORT', '3000'), 'WEB_PORT'),
-    schedulerIntervalMs: toInt(optional(env, 'SCHEDULER_INTERVAL_MS', '10000'), 'SCHEDULER_INTERVAL_MS'),
-    workerConcurrency: toInt(optional(env, 'WORKER_CONCURRENCY', '4'), 'WORKER_CONCURRENCY'),
+    schedulerIntervalMs: toInt(
+      optional(env, 'SCHEDULER_INTERVAL_MS', '10000'),
+      'SCHEDULER_INTERVAL_MS',
+    ),
+    workerConcurrency: toInt(
+      optional(env, 'WORKER_CONCURRENCY', '4'),
+      'WORKER_CONCURRENCY',
+    ),
   };
 }

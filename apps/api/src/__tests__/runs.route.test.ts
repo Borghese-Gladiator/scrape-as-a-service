@@ -14,7 +14,15 @@ function fakePool(): Pool {
     ): Promise<QueryResult<R>> {
       let rows: unknown[] = [];
       if (text.includes('FROM scrape_definitions')) {
-        rows = [{ id: 'def-1', name: 'd', url: 'https://x', config: {}, created_at: new Date() }];
+        rows = [
+          {
+            id: 'def-1',
+            name: 'd',
+            url: 'https://x',
+            config: {},
+            created_at: new Date(),
+          },
+        ];
       } else if (text.includes('INSERT INTO scrape_runs')) {
         rows = [
           {
@@ -29,7 +37,13 @@ function fakePool(): Pool {
           },
         ];
       }
-      return { rows: rows as R[], command: '', rowCount: rows.length, oid: 0, fields: [] };
+      return {
+        rows: rows as R[],
+        command: '',
+        rowCount: rows.length,
+        oid: 0,
+        fields: [],
+      };
     },
   } as unknown as Pool;
 }
@@ -58,7 +72,9 @@ describe('POST /runs (manual trigger)', () => {
     const queue = { add: vi.fn(async () => ({})) } as unknown as Queue<ScrapeJobData>;
     const app = createServer(fakePool(), queue, storage);
 
-    const res = await request(app).post('/runs/api-trigger').send({ definitionId: 'def-1' });
+    const res = await request(app)
+      .post('/runs/api-trigger')
+      .send({ definitionId: 'def-1' });
 
     expect(res.status).toBe(201);
     expect(res.body.trigger).toBe('API');

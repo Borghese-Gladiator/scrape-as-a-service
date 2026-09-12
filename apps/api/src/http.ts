@@ -1,4 +1,10 @@
-import type { ErrorRequestHandler, NextFunction, Request, RequestHandler, Response } from 'express';
+import type {
+  ErrorRequestHandler,
+  NextFunction,
+  Request,
+  RequestHandler,
+  Response,
+} from 'express';
 
 export class HttpError extends Error {
   constructor(

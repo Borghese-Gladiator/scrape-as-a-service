@@ -2,11 +2,7 @@ import { beforeEach, expect, it } from 'vitest';
 import { describeIntegration, useTestDb } from '../../../../test/integration/harness.js';
 import { createDefinition } from '../repositories/definitions.js';
 import { createRun } from '../repositories/runs.js';
-import {
-  getArtifact,
-  insertArtifact,
-  listArtifacts,
-} from '../repositories/artifacts.js';
+import { getArtifact, insertArtifact, listArtifacts } from '../repositories/artifacts.js';
 import type { ArtifactType, ScrapeConfig } from '../types.js';
 
 const CONFIG: ScrapeConfig = {

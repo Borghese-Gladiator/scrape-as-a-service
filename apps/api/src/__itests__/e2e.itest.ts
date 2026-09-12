@@ -11,7 +11,10 @@ import {
   type ScrapeJobData,
   type StorageClient,
 } from '@scraper/shared';
-import { describeIntegration, truncateAll } from '../../../../test/integration/harness.js';
+import {
+  describeIntegration,
+  truncateAll,
+} from '../../../../test/integration/harness.js';
 import { testConfig } from '../../../../test/integration/config.js';
 import { processRun } from '../../../worker/src/process-run.js';
 import { createServer } from '../server.js';
@@ -53,7 +56,9 @@ async function pollRun(apiBase: string, runId: string): Promise<Record<string, u
     if (last.status === 'SUCCEEDED' || last.status === 'FAILED') return last;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`run ${runId} never reached a terminal status: ${JSON.stringify(last)}`);
+  throw new Error(
+    `run ${runId} never reached a terminal status: ${JSON.stringify(last)}`,
+  );
 }
 
 describeIntegration('end to end: definition to artifact download', () => {

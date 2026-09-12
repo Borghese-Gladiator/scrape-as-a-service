@@ -1,12 +1,7 @@
 import { Router } from 'express';
 import type { Pool } from 'pg';
 import type { Queue } from 'bullmq';
-import {
-  createRun,
-  getDefinition,
-  getRunDetail,
-  listRuns,
-} from '@scraper/db';
+import { createRun, getDefinition, getRunDetail, listRuns } from '@scraper/db';
 import { enqueueRun, type ScrapeJobData } from '@scraper/shared';
 import type { RunTrigger } from '@scraper/db';
 import { asyncHandler, HttpError } from '../http.js';

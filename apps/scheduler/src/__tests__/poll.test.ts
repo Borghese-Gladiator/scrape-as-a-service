@@ -17,7 +17,11 @@ interface ScheduleRow extends QueryResultRow {
 }
 
 class FakeDb implements Queryable {
-  runsCreated: Array<{ definitionId: string; scheduleId: string | null; trigger: string }> = [];
+  runsCreated: Array<{
+    definitionId: string;
+    scheduleId: string | null;
+    trigger: string;
+  }> = [];
   advanced: Array<{ id: string; lastRunAt: Date; nextRunAt: Date }> = [];
   private seq = 0;
 
@@ -40,7 +44,11 @@ class FakeDb implements Queryable {
     }
     if (text.includes('INSERT INTO scrape_runs')) {
       this.seq += 1;
-      const [definitionId, scheduleId, trigger] = values as [string, string | null, string];
+      const [definitionId, scheduleId, trigger] = values as [
+        string,
+        string | null,
+        string,
+      ];
       this.runsCreated.push({ definitionId, scheduleId, trigger });
       return [{ id: `run-${this.seq}`, definition_id: definitionId }];
     }
