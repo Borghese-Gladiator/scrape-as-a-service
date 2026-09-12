@@ -13,11 +13,14 @@
   "dependencies": {
     "@scraper/db": "*",
     "@scraper/shared": "*",
+    "cors": "^2.8.6",
     "express": "^4.21.2"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",
     "@types/supertest": "^6.0.2",
+    "playwright": "^1.49.1",
     "supertest": "^7.0.0"
   }
 }
