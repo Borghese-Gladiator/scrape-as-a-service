@@ -12,6 +12,7 @@ export interface ScrapeDefinition {
   url: string;
   config: ScrapeConfig;
   created_at: Date;
+  deleted_at: Date | null;
 }
 
 export interface ScrapeSchedule {
@@ -66,11 +67,28 @@ export interface CreateDefinitionInput {
   config: ScrapeConfig;
 }
 
+export interface UpdateDefinitionInput {
+  name?: string;
+  url?: string;
+  config?: ScrapeConfig;
+}
+
 export interface CreateScheduleInput {
   definitionId: string;
   cron: string;
   timezone: string;
   enabled?: boolean;
+}
+
+/** One keyset page. `nextCursor` is null when the page is the last one. */
+export interface Page<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+export interface PageQuery {
+  limit?: number;
+  cursor?: string;
 }
 
 export interface RunDetail extends ScrapeRun {

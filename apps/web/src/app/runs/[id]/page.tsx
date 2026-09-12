@@ -25,7 +25,11 @@ export default async function RunDetailPage({ params }: { params: { id: string }
   return (
     <div>
       <h1>Run {run.id.slice(0, 8)}</h1>
-      <RunDetail run={run} artifactDownloadUrl={(artifactId) => api.artifactDownloadUrl(artifactId)} />
+      <RunDetail
+        run={run}
+        artifactDownloadUrl={(artifactId) => api.artifactDownloadUrl(artifactId)}
+        archiveUrl={api.runArchiveUrl(run.id)}
+      />
     </div>
   );
 }

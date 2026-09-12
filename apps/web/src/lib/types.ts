@@ -86,6 +86,13 @@ export interface ScrapeDefinition {
   url: string;
   config: ScrapeConfig;
   created_at: string;
+  deleted_at: string | null;
+}
+
+/** One keyset page. The list endpoints return this shape. */
+export interface Page<T> {
+  items: T[];
+  nextCursor: string | null;
 }
 
 export interface ScrapeSchedule {
@@ -164,6 +171,7 @@ export interface ApiClient {
   getRun(id: string): Promise<RunDetail>;
   listArtifacts(runId: string): Promise<Artifact[]>;
   artifactDownloadUrl(artifactId: string): string;
+  runArchiveUrl(runId: string): string;
 }
 
 export const RUN_COMPLETE_STATUSES: readonly RunStatus[] = ['SUCCEEDED', 'FAILED'];

@@ -14,6 +14,10 @@
     "@scraper/db": "*",
     "@scraper/shared": "*",
     "bullmq": "^5.34.0",
-    "playwright": "1.49.1"
+    "playwright": "1.49.1",
+    "yauzl": "^3.4.0"
+  },
+  "devDependencies": {
+    "@types/yauzl": "^2.10.3"
   }
 }

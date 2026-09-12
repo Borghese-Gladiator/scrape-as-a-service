@@ -124,6 +124,7 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET:-scraper-artifacts}
       MINIO_USE_SSL: "false"
       SCHEDULER_INTERVAL_MS: ${SCHEDULER_INTERVAL_MS:-10000}
+      RETENTION_DAYS: ${RETENTION_DAYS:-30}
     depends_on:
       postgres:
         condition: service_healthy
