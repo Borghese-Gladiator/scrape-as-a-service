@@ -10,9 +10,15 @@ export class HttpError extends Error {
   }
 }
 
-export function asyncHandler(fn: RequestHandler): RequestHandler {
+export type AsyncRequestHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => Promise<unknown>;
+
+export function asyncHandler(fn: AsyncRequestHandler): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
+    fn(req, res, next).catch(next);
   };
 }
 

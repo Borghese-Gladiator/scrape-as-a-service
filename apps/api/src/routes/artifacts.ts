@@ -27,7 +27,7 @@ export function artifactsRouter(pool: Pool, storage: StorageClient): Router {
         'Content-Disposition',
         `attachment; filename="${artifact.object_key.split('/').pop() ?? 'artifact'}"`,
       );
-      stream.on('error', (err) => {
+      stream.on('error', (err: Error) => {
         res.destroy(err);
       });
       stream.pipe(res);
