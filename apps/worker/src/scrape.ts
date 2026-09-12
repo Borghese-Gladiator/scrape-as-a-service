@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Browser } from 'playwright';
 import type { ScrapeConfig, ScrapeResult } from '@scraper/shared';
+import { attachDiagnostics, collectConsole } from './diagnostics.js';
 
 function needsRecording(config: ScrapeConfig): boolean {
   return config.artifacts.includes('WEBM');
@@ -28,6 +29,7 @@ export async function runScrape(
     recordDir ? { recordVideo: { dir: recordDir } } : {},
   );
   const page = await context.newPage();
+  const consoleEntries = collectConsole(page);
 
   try {
     await page.goto(url, { waitUntil: 'load' });
@@ -56,6 +58,8 @@ export async function runScrape(
     }
 
     return result;
+  } catch (err) {
+    throw await attachDiagnostics(err, page, consoleEntries);
   } finally {
     if (!page.isClosed()) await page.close().catch(() => {});
     await context.close().catch(() => {});

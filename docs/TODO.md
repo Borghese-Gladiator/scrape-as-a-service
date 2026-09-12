@@ -258,12 +258,12 @@ count timeouts against selector misses against network failures.
 
 ## 5. Observability
 
-### 5.1 Logging is `console.log` — P1
+### 5.1 Logging is `console.log` — P1 — **DONE (phase 6)**
 There is no structured logger, no log level, no request id, and no run id on
 worker log lines. Correlating a failed run to its logs means guessing from
 timestamps.
 
-### 5.2 No health endpoint on worker or scheduler — P2
+### 5.2 No health endpoint on worker or scheduler — P2 — **DONE (phase 6)**
 Only the API has `/health`. The compose file gives worker and scheduler no
 healthcheck, so a crash-looping worker looks the same as a healthy one in
 `docker compose ps`.
@@ -273,12 +273,12 @@ Nothing reports queue depth, active jobs, failure rate, or run duration. There i
 no Bull Board or equivalent. When runs stop appearing, there is no way to tell
 whether the queue is backed up or the scheduler is dead.
 
-### 5.4 The UI does not refresh — P2
+### 5.4 The UI does not refresh — P2 — **DONE (phase 6)**
 Every page is `dynamic = 'force-dynamic'` server-rendered once. A QUEUED run
 needs a manual browser reload to show progress. There is no polling, no
 streaming, and no auto-refresh on the run detail page.
 
-### 5.5 Run and attempt records carry no diagnostics — P2
+### 5.5 Run and attempt records carry no diagnostics — P2 — **DONE (phase 6)**
 When a run fails there is only an error string. There is no failure screenshot,
 no captured HTML at the point of failure, no console log from the page, and no
 network trace. Debugging a broken selector means reproducing it by hand.

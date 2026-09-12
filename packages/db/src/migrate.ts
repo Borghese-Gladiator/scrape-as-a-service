@@ -2,9 +2,11 @@ import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Pool } from 'pg';
+import { createLogger } from '@scraper/shared';
 import { getPool } from './client.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const logger = createLogger('db');
 
 /** Resolve the migrations directory relative to the package root (dist/ -> ../migrations). */
 function defaultMigrationsDir(): string {
@@ -52,8 +54,7 @@ export async function runMigrations(
       await client.query(sql);
       await client.query('INSERT INTO schema_migrations (filename) VALUES ($1)', [file]);
       await client.query('COMMIT');
-      // eslint-disable-next-line no-console
-      console.log(`applied migration: ${file}`);
+      logger.info({ file }, 'applied migration');
     } catch (err) {
       await client.query('ROLLBACK');
       throw new Error(`Migration failed: ${file}: ${(err as Error).message}`);
@@ -78,8 +79,7 @@ if (isMain) {
   migrateCli()
     .then(() => process.exit(0))
     .catch((err) => {
-      // eslint-disable-next-line no-console
-      console.error(err);
+      logger.fatal({ err }, 'migration run failed');
       process.exit(1);
     });
 }

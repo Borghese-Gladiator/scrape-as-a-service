@@ -1,5 +1,5 @@
 import { getApiClient } from '@/lib/api';
-import { RunDetail } from '@/components/RunDetail';
+import { RunDetailLive } from '@/components/RunDetailLive';
 import type { RunDetail as RunDetailType } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +25,7 @@ export default async function RunDetailPage({ params }: { params: { id: string }
   return (
     <div>
       <h1>Run {run.id.slice(0, 8)}</h1>
-      <RunDetail run={run} artifactDownloadUrl={(artifactId) => api.artifactDownloadUrl(artifactId)} />
+      <RunDetailLive initialRun={run} />
     </div>
   );
 }

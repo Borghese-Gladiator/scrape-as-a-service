@@ -8,8 +8,14 @@ import {
   updateRunStatus,
   type Queryable,
 } from '@scraper/db';
-import type { ScrapeJobData, StorageClient } from '@scraper/shared';
-import { buildAndUploadArtifacts } from './artifacts.js';
+import {
+  createLogger,
+  type Logger,
+  type ScrapeJobData,
+  type StorageClient,
+} from '@scraper/shared';
+import { buildAndUploadArtifacts, uploadFailureDiagnostics } from './artifacts.js';
+import { getDiagnostics } from './diagnostics.js';
 import { runScrape } from './scrape.js';
 
 export interface ProcessRunDeps {
@@ -17,6 +23,7 @@ export interface ProcessRunDeps {
   storage: StorageClient;
   workerId: string;
   launchBrowser: () => Promise<Browser>;
+  logger?: Logger;
 }
 
 function errorCode(err: unknown): string {
@@ -63,7 +70,13 @@ export async function processRun(
   const { runId, definitionId } = job.data;
 
   const attempt = await insertAttempt(pool, runId, workerId);
+  const logger = (deps.logger ?? createLogger('worker')).child({
+    runId,
+    definitionId,
+    attemptId: attempt.id,
+  });
   await updateRunStatus(pool, runId, 'RUNNING', new Date());
+  logger.info({ attemptNumber: attempt.attempt_number }, 'run started');
 
   let browser: Browser | undefined;
   try {
@@ -89,8 +102,37 @@ export async function processRun(
 
     await finishAttempt(pool, attempt.id, 'SUCCEEDED');
     await updateRunStatus(pool, runId, 'SUCCEEDED', new Date());
+    logger.info({ artifacts: uploaded.length, rows: result.rows.length }, 'run succeeded');
   } catch (err) {
     if (browser) await browser.close().catch(() => {});
+    await storeDiagnostics(pool, storage, runId, err, logger);
+    logger.error({ err }, 'run attempt failed');
     return finalizeFailure(pool, job, attempt.id, err as Error);
+  }
+}
+
+/**
+ * Store whatever the failing scrape captured. This runs before finalizeFailure
+ * so the artifacts exist by the time the run reaches FAILED. It never throws:
+ * a diagnostics upload must not replace the error that caused the failure.
+ */
+async function storeDiagnostics(
+  pool: Queryable,
+  storage: StorageClient,
+  runId: string,
+  err: unknown,
+  logger: Logger,
+): Promise<void> {
+  const diagnostics = getDiagnostics(err);
+  if (!diagnostics) return;
+
+  try {
+    const uploaded = await uploadFailureDiagnostics(storage, runId, diagnostics);
+    for (const { type, put } of uploaded) {
+      await insertArtifact(pool, runId, type, put);
+    }
+    logger.info({ artifacts: uploaded.length }, 'stored failure diagnostics');
+  } catch (diagnosticErr) {
+    logger.warn({ err: diagnosticErr }, 'could not store failure diagnostics');
   }
 }

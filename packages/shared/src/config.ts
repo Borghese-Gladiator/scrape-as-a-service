@@ -11,6 +11,8 @@ export interface AppConfig {
   };
   apiPort: number;
   webPort: number;
+  workerHealthPort: number;
+  schedulerHealthPort: number;
   schedulerIntervalMs: number;
   workerConcurrency: number;
 }
@@ -54,6 +56,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     apiPort: toInt(optional(env, 'API_PORT', '4000'), 'API_PORT'),
     webPort: toInt(optional(env, 'WEB_PORT', '3000'), 'WEB_PORT'),
+    workerHealthPort: toInt(optional(env, 'WORKER_HEALTH_PORT', '4001'), 'WORKER_HEALTH_PORT'),
+    schedulerHealthPort: toInt(
+      optional(env, 'SCHEDULER_HEALTH_PORT', '4002'),
+      'SCHEDULER_HEALTH_PORT',
+    ),
     schedulerIntervalMs: toInt(optional(env, 'SCHEDULER_INTERVAL_MS', '10000'), 'SCHEDULER_INTERVAL_MS'),
     workerConcurrency: toInt(optional(env, 'WORKER_CONCURRENCY', '4'), 'WORKER_CONCURRENCY'),
   };

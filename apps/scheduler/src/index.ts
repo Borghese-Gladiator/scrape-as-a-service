@@ -1,9 +1,10 @@
 import { getPool } from '@scraper/db';
-import { getQueue, loadConfig } from '@scraper/shared';
+import { createLogger, getQueue, loadConfig, startHealthServer } from '@scraper/shared';
 import { pollOnce } from './poll.js';
 
 export async function startScheduler(): Promise<void> {
   const config = loadConfig();
+  const logger = createLogger('scheduler');
   const pool = getPool(config);
   const queue = getQueue(config);
 
@@ -14,12 +15,10 @@ export async function startScheduler(): Promise<void> {
     try {
       const count = await pollOnce({ pool, queue, now: new Date() });
       if (count > 0) {
-        // eslint-disable-next-line no-console
-        console.log(`scheduler enqueued ${count} run(s)`);
+        logger.info({ count }, 'scheduler enqueued runs');
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('scheduler poll failed:', err);
+      logger.error({ err }, 'scheduler poll failed');
     } finally {
       running = false;
     }
@@ -29,15 +28,18 @@ export async function startScheduler(): Promise<void> {
     void tick();
   }, config.schedulerIntervalMs);
 
-  // eslint-disable-next-line no-console
-  console.log(`scheduler started (interval=${config.schedulerIntervalMs}ms)`);
+  await startHealthServer({ port: config.schedulerHealthPort, logger });
+
+  logger.info(
+    { intervalMs: config.schedulerIntervalMs, healthPort: config.schedulerHealthPort },
+    'scheduler started',
+  );
 }
 
 const isMain = process.argv[1]?.endsWith('index.js');
 if (isMain) {
   startScheduler().catch((err) => {
-    // eslint-disable-next-line no-console
-    console.error(err);
+    createLogger('scheduler').fatal({ err }, 'scheduler failed to start');
     process.exit(1);
   });
 }
