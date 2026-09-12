@@ -6,5 +6,5 @@
   },
   "references": [{ "path": "../shared" }],
   "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules", "src/**/__tests__/**"]
+  "exclude": ["dist", "node_modules", "src/**/__tests__/**", "src/**/__itests__/**"]
 }
