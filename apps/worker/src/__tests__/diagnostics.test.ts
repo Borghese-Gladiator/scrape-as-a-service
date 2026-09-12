@@ -96,6 +96,16 @@ describe('attachDiagnostics', () => {
     });
   });
 
+  it('hides the diagnostics from an error log serializer', async () => {
+    const error = new Error('selector not found');
+
+    await attachDiagnostics(error, fakePage(), []);
+
+    expect(Object.keys(error)).not.toContain('diagnostics');
+    expect(JSON.stringify({ ...error })).not.toContain('png-bytes');
+    expect(getDiagnostics(error)?.screenshot).toEqual(Buffer.from('png-bytes'));
+  });
+
   it('keeps the original error when the capture itself throws', async () => {
     const error = new Error('selector not found');
     const page = fakePage({

@@ -61,7 +61,15 @@ export async function attachDiagnostics(
     }
 
     if (error instanceof Error) {
-      (error as DiagnosticError).diagnostics = diagnostics;
+      // Non-enumerable: a log serializer walks the enumerable properties of an
+      // error, so a plain assignment prints the whole screenshot buffer byte by
+      // byte on every failure.
+      Object.defineProperty(error, 'diagnostics', {
+        value: diagnostics,
+        enumerable: false,
+        writable: true,
+        configurable: true,
+      });
     }
   } catch {
     // never let diagnostics capture change the outcome
