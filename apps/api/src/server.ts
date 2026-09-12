@@ -1,3 +1,4 @@
+import cors from 'cors';
 import express, { type Express } from 'express';
 import type { Pool } from 'pg';
 import type { Queue } from 'bullmq';
@@ -21,6 +22,13 @@ export function createServer(
   storage: StorageClient,
 ): Express {
   const app = express();
+  // The web UI posts from the browser on another origin, so every route needs
+  // CORS. CORS_ORIGINS is a comma-separated allowlist; unset means allow any.
+  const allowlist = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  app.use(cors({ origin: allowlist.length > 0 ? allowlist : true }));
   app.use(express.json());
 
   app.get('/health', (_req, res) => {
