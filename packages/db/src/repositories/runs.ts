@@ -11,32 +11,36 @@ export async function createRun(
   definitionId: string,
   trigger: RunTrigger,
   scheduleId: string | null = null,
-): Promise<ScrapeRun> {
+): Promise<ScrapeRun | null> {
   const { rows } = await db.query<ScrapeRun>(
     `INSERT INTO scrape_runs (definition_id, schedule_id, status, trigger)
      VALUES ($1, $2, 'QUEUED', $3)
      RETURNING ${COLUMNS}`,
     [definitionId, scheduleId, trigger],
   );
-  return rows[0]!;
+  return rows[0] ?? null;
 }
 
+/**
+ * COALESCE keeps the first start time. A retry transitions the run to RUNNING
+ * again, and the total duration must measure from the first attempt.
+ */
 export async function updateRunStatus(
   db: Queryable,
   id: string,
   status: RunStatus,
   at: Date,
-): Promise<ScrapeRun> {
+): Promise<ScrapeRun | null> {
   const { rows } = await db.query<ScrapeRun>(
     `UPDATE scrape_runs
      SET status = $2::run_status,
-         started_at = CASE WHEN $2 = 'RUNNING' THEN $3 ELSE started_at END,
+         started_at = CASE WHEN $2 = 'RUNNING' THEN COALESCE(started_at, $3) ELSE started_at END,
          finished_at = CASE WHEN $2 IN ('SUCCEEDED', 'FAILED') THEN $3 ELSE finished_at END
      WHERE id = $1
      RETURNING ${COLUMNS}`,
     [id, status, at],
   );
-  return rows[0]!;
+  return rows[0] ?? null;
 }
 
 export async function getRun(db: Queryable, id: string): Promise<ScrapeRun | null> {

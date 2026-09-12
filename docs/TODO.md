@@ -116,6 +116,11 @@ written.
 Fix: add `cors` to the API with an allowlist from an env var, or proxy the API
 through a Next.js route handler so the request is same-origin.
 
+**DONE (phase 1)**
+The API registers the `cors` middleware before the routes. The allowlist comes
+from `CORS_ORIGINS`, a comma separated variable that defaults to
+`http://localhost:3000`.
+
 ### 2.2 A run can stay RUNNING forever — P1
 `processRun` sets the run to RUNNING, and only `finalizeFailure` or the success
 path move it out. If the worker process dies mid-job, or the container is
@@ -130,6 +135,13 @@ Neither `apps/worker/src/index.ts` nor `apps/scheduler/src/index.ts` handles
 `SIGTERM`. `docker compose down` or a rescale kills in-flight work, which
 produces the stuck RUNNING state in 2.2. Postgres pools, the Redis connection,
 and the browser are never closed.
+
+**DONE (phase 1)**
+`onShutdown` in `packages/shared/src/shutdown.ts` runs one teardown on the first
+`SIGTERM` or `SIGINT`, then exits 0. The worker drains its jobs, closes every
+open browser, and closes the pool. The scheduler waits for the poll in flight,
+then closes the queue and the pool. A 15 second timer exits either process
+anyway.
 
 ### 2.4 The scheduler is not safe to run more than once — P1
 `pollOnce` reads due schedules, then creates a run, then advances `next_run_at`
@@ -157,6 +169,11 @@ caller will hit a `TypeError` on a property read.
 Fix: return `T | null` and let callers handle it, or throw a typed
 `NotFoundError` in the repository.
 
+**DONE (phase 1)**
+Every `return rows[0]!` is now `return rows[0] ?? null`. Nine functions return
+`T | null`. The API answers 404 for a missing schedule and 500 for an insert
+that returns no row. The worker and the scheduler throw a named error.
+
 ### 2.7 `started_at` is overwritten by every retry — P2
 `updateRunStatus` sets `started_at` whenever the status is RUNNING
 (`packages/db/src/repositories/runs.ts:28`). Each retry calls it again, so the
@@ -164,6 +181,10 @@ run's start time is the start of the *last* attempt, not the first. Total run
 duration is therefore wrong whenever a retry happened.
 
 Fix: `started_at = COALESCE(started_at, $3)`.
+
+**DONE (phase 1)**
+`updateRunStatus` writes `COALESCE(started_at, $3)`, so a retry keeps the start
+time of the first attempt.
 
 ### 2.8 No per-run timeout — P1
 Only `page.goto` has Playwright's default 30-second cap. A scrape over many rows,
@@ -247,6 +268,11 @@ It exists in `apps/api/src/routes/runs.ts:63`. Its only difference from
 `POST /runs` is the `trigger` enum value it records. It is absent from the
 README and from the UI. Either document it or fold it into `POST /runs` with a
 `trigger` field in the body.
+
+**DONE (phase 1)**
+The route is gone. `POST /runs` takes an optional `trigger` field with the
+values `MANUAL` and `API`, and defaults to `MANUAL`. Any other value answers
+400. The README documents the route and the field.
 
 ### 4.7 No structured error taxonomy — P2
 `errorCode` returns `err.name`, which for a plain `Error` is the literal string

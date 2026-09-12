@@ -6,14 +6,14 @@ const COLUMNS = 'id, name, url, config, created_at';
 export async function createDefinition(
   db: Queryable,
   input: CreateDefinitionInput,
-): Promise<ScrapeDefinition> {
+): Promise<ScrapeDefinition | null> {
   const { rows } = await db.query<ScrapeDefinition>(
     `INSERT INTO scrape_definitions (name, url, config)
      VALUES ($1, $2, $3)
      RETURNING ${COLUMNS}`,
     [input.name, input.url, JSON.stringify(input.config)],
   );
-  return rows[0]!;
+  return rows[0] ?? null;
 }
 
 export async function listDefinitions(db: Queryable): Promise<ScrapeDefinition[]> {

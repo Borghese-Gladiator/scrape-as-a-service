@@ -33,6 +33,9 @@ export function definitionsRouter(pool: Pool): Router {
         throw new HttpError(400, (err as Error).message);
       }
       const definition = await createDefinition(pool, { name, url, config });
+      if (!definition) {
+        throw new HttpError(500, 'failed to create the definition');
+      }
       res.status(201).json(definition);
     }),
   );

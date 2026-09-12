@@ -20,6 +20,9 @@ export async function pollOnce(deps: PollDeps): Promise<number> {
   let created = 0;
   for (const schedule of due) {
     const run = await createRun(pool, schedule.definition_id, 'SCHEDULE', schedule.id);
+    if (!run) {
+      throw new Error(`failed to create a run for schedule: ${schedule.id}`);
+    }
     await enqueueRun(queue, { runId: run.id, definitionId: schedule.definition_id });
     const nextRunAt = computeNextRun(schedule.cron, schedule.timezone, now);
     await advanceSchedule(pool, schedule.id, now, nextRunAt);

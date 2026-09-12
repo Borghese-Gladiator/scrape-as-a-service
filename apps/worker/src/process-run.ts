@@ -63,7 +63,13 @@ export async function processRun(
   const { runId, definitionId } = job.data;
 
   const attempt = await insertAttempt(pool, runId, workerId);
-  await updateRunStatus(pool, runId, 'RUNNING', new Date());
+  if (!attempt) {
+    throw new Error(`failed to create an attempt for run: ${runId}`);
+  }
+  const running = await updateRunStatus(pool, runId, 'RUNNING', new Date());
+  if (!running) {
+    throw new Error(`run not found: ${runId}`);
+  }
 
   let browser: Browser | undefined;
   try {

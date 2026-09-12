@@ -8,14 +8,14 @@ export async function createSchedule(
   db: Queryable,
   input: CreateScheduleInput,
   nextRunAt: Date,
-): Promise<ScrapeSchedule> {
+): Promise<ScrapeSchedule | null> {
   const { rows } = await db.query<ScrapeSchedule>(
     `INSERT INTO scrape_schedules (definition_id, cron, timezone, enabled, next_run_at)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING ${COLUMNS}`,
     [input.definitionId, input.cron, input.timezone, input.enabled ?? true, nextRunAt],
   );
-  return rows[0]!;
+  return rows[0] ?? null;
 }
 
 export async function listSchedules(
@@ -40,12 +40,12 @@ export async function setScheduleEnabled(
   db: Queryable,
   id: string,
   enabled: boolean,
-): Promise<ScrapeSchedule> {
+): Promise<ScrapeSchedule | null> {
   const { rows } = await db.query<ScrapeSchedule>(
     `UPDATE scrape_schedules SET enabled = $2 WHERE id = $1 RETURNING ${COLUMNS}`,
     [id, enabled],
   );
-  return rows[0]!;
+  return rows[0] ?? null;
 }
 
 export async function findDueSchedules(
@@ -66,7 +66,7 @@ export async function advanceSchedule(
   id: string,
   lastRunAt: Date,
   nextRunAt: Date,
-): Promise<ScrapeSchedule> {
+): Promise<ScrapeSchedule | null> {
   const { rows } = await db.query<ScrapeSchedule>(
     `UPDATE scrape_schedules
      SET last_run_at = $2, next_run_at = $3
@@ -74,5 +74,5 @@ export async function advanceSchedule(
      RETURNING ${COLUMNS}`,
     [id, lastRunAt, nextRunAt],
   );
-  return rows[0]!;
+  return rows[0] ?? null;
 }

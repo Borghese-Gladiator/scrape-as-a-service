@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import { Worker } from 'bullmq';
-import { chromium } from 'playwright';
-import { getPool } from '@scraper/db';
+import { chromium, type Browser } from 'playwright';
+import { closePool, getPool } from '@scraper/db';
 import {
   getRedisConnection,
   getStorage,
   loadConfig,
+  onShutdown,
   SCRAPE_QUEUE_NAME,
   type ScrapeJobData,
 } from '@scraper/shared';
@@ -19,6 +20,7 @@ export async function startWorker(): Promise<void> {
   await storage.ensureBucket();
 
   const workerId = `${hostname()}-${randomUUID()}`;
+  const openBrowsers = new Set<Browser>();
 
   const worker = new Worker<ScrapeJobData>(
     SCRAPE_QUEUE_NAME,
@@ -27,7 +29,12 @@ export async function startWorker(): Promise<void> {
         pool,
         storage,
         workerId,
-        launchBrowser: () => chromium.launch(),
+        launchBrowser: async () => {
+          const browser = await chromium.launch();
+          openBrowsers.add(browser);
+          browser.once('disconnected', () => openBrowsers.delete(browser));
+          return browser;
+        },
       });
     },
     {
@@ -42,6 +49,21 @@ export async function startWorker(): Promise<void> {
     // eslint-disable-next-line no-console
     console.error(`job ${job?.id} failed: ${err.message}`);
   });
+
+  onShutdown(
+    async () => {
+      // close() drains the active jobs and closes the Redis connection BullMQ owns.
+      await worker.close();
+      await Promise.all([...openBrowsers].map((browser) => browser.close().catch(() => {})));
+      await closePool();
+    },
+    {
+      onSignal: (signal) => {
+        // eslint-disable-next-line no-console
+        console.log(`worker ${workerId} received ${signal}, shutting down`);
+      },
+    },
+  );
 
   // eslint-disable-next-line no-console
   console.log(`worker ${workerId} started (concurrency=${config.workerConcurrency})`);
