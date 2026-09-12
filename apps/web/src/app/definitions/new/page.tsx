@@ -2,20 +2,19 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { DefinitionForm } from '@/components/DefinitionForm';
+import { DefinitionForm, type DefinitionFormValue } from '@/components/DefinitionForm';
 import { getApiClient } from '@/lib/api';
-import type { CreateDefinitionInput } from '@/lib/types';
 
 export default function NewDefinitionPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(input: CreateDefinitionInput) {
+  async function handleSubmit(value: DefinitionFormValue) {
     setSubmitting(true);
     setError(null);
     try {
-      const definition = await getApiClient().createDefinition(input);
+      const definition = await getApiClient().createDefinition(value);
       router.push(`/definitions/${definition.id}`);
     } catch (err) {
       setError((err as Error).message);

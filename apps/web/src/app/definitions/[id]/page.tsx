@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ScheduleForm } from '@/components/ScheduleForm';
 import { RunList } from '@/components/RunList';
@@ -103,6 +104,9 @@ export default function DefinitionDetailPage() {
     <div>
       <h1>{definition.name}</h1>
       <p className="muted">{definition.url}</p>
+      <p>
+        <Link href={`/definitions/${id}/edit`}>Edit definition</Link>
+      </p>
 
       {error ? (
         <p className="error" role="alert">

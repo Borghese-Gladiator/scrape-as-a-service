@@ -145,6 +145,13 @@ export interface CreateDefinitionInput {
   config: ScrapeConfig | ScrapeConfigV1;
 }
 
+/** `PUT /definitions/:id` replaces the whole definition. */
+export interface UpdateDefinitionInput {
+  name: string;
+  url: string;
+  config: ScrapeConfig | ScrapeConfigV1;
+}
+
 export interface CreateScheduleInput {
   definitionId: string;
   cron: string;
@@ -156,6 +163,8 @@ export interface ApiClient {
   listDefinitions(): Promise<ScrapeDefinition[]>;
   getDefinition(id: string): Promise<ScrapeDefinition>;
   createDefinition(input: CreateDefinitionInput): Promise<ScrapeDefinition>;
+  updateDefinition(id: string, input: UpdateDefinitionInput): Promise<ScrapeDefinition>;
+  deleteDefinition(id: string): Promise<void>;
   listSchedules(definitionId?: string): Promise<ScrapeSchedule[]>;
   createSchedule(input: CreateScheduleInput): Promise<ScrapeSchedule>;
   toggleSchedule(id: string, enabled: boolean): Promise<ScrapeSchedule>;
