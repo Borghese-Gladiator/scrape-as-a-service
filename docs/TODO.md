@@ -116,7 +116,7 @@ written.
 Fix: add `cors` to the API with an allowlist from an env var, or proxy the API
 through a Next.js route handler so the request is same-origin.
 
-### 2.2 A run can stay RUNNING forever — P1
+### 2.2 A run can stay RUNNING forever — P1 **DONE (phase 3)**
 `processRun` sets the run to RUNNING, and only `finalizeFailure` or the success
 path move it out. If the worker process dies mid-job, or the container is
 killed, nothing writes a terminal status. There is no reaper, no lease, and no
@@ -131,7 +131,7 @@ Neither `apps/worker/src/index.ts` nor `apps/scheduler/src/index.ts` handles
 produces the stuck RUNNING state in 2.2. Postgres pools, the Redis connection,
 and the browser are never closed.
 
-### 2.4 The scheduler is not safe to run more than once — P1
+### 2.4 The scheduler is not safe to run more than once — P1 **DONE (phase 3)**
 `pollOnce` reads due schedules, then creates a run, then advances `next_run_at`
 (`apps/scheduler/src/poll.ts:19`). There is no row lock and no transaction. Two
 scheduler replicas both see the same due schedule and both create a run.
@@ -141,7 +141,7 @@ runs are separate rows with separate ids, so both are enqueued.
 Fix: `SELECT ... FOR UPDATE SKIP LOCKED`, or claim the schedule with a
 conditional `UPDATE ... WHERE next_run_at <= now()` that returns the claimed row.
 
-### 2.5 Missed schedules are dropped silently — P1
+### 2.5 Missed schedules are dropped silently — P1 **DONE (phase 3)**
 `computeNextRun(cron, tz, now)` computes the next fire time from *now*, not from
 `last_run_at` (`apps/scheduler/src/poll.ts:24`). If the scheduler is down for a
 day, every window in that day is skipped with no record. There is no catch-up
@@ -165,13 +165,13 @@ duration is therefore wrong whenever a retry happened.
 
 Fix: `started_at = COALESCE(started_at, $3)`.
 
-### 2.8 No per-run timeout — P1
+### 2.8 No per-run timeout — P1 **DONE (phase 3)**
 Only `page.goto` has Playwright's default 30-second cap. A scrape over many rows,
 or a page that never settles, has no overall limit. The job holds a worker slot
 until BullMQ's stall detection fires 30 seconds later, and stall recovery can
 then run the same job twice.
 
-### 2.9 One Chromium process per job — P2
+### 2.9 One Chromium process per job — P2 **DONE (phase 3)**
 `launchBrowser: () => chromium.launch()` starts a full browser for every job
 (`apps/worker/src/index.ts:31`). At `WORKER_CONCURRENCY=4` that is four Chromium
 processes launched and torn down per batch. Launch cost dominates short scrapes.
@@ -248,7 +248,7 @@ It exists in `apps/api/src/routes/runs.ts:63`. Its only difference from
 README and from the UI. Either document it or fold it into `POST /runs` with a
 `trigger` field in the body.
 
-### 4.7 No structured error taxonomy — P2
+### 4.7 No structured error taxonomy — P2 **DONE (phase 3)**
 `errorCode` returns `err.name`, which for a plain `Error` is the literal string
 `"Error"` (`apps/worker/src/process-run.ts:22`). Almost every failure is
 therefore recorded as `Error` with a free-text message. There is no way to

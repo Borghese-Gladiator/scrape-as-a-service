@@ -1,6 +1,7 @@
 import { getPool } from '@scraper/db';
 import { getQueue, loadConfig } from '@scraper/shared';
 import { pollOnce } from './poll.js';
+import { sweepOnce } from './sweep.js';
 
 export async function startScheduler(): Promise<void> {
   const config = loadConfig();
@@ -12,10 +13,20 @@ export async function startScheduler(): Promise<void> {
     if (running) return;
     running = true;
     try {
-      const count = await pollOnce({ pool, queue, now: new Date() });
+      const now = new Date();
+      const count = await pollOnce({ pool, queue, now });
       if (count > 0) {
         // eslint-disable-next-line no-console
         console.log(`scheduler enqueued ${count} run(s)`);
+      }
+      const swept = await sweepOnce({
+        pool,
+        now,
+        staleAttemptMinutes: config.staleAttemptMinutes,
+      });
+      if (swept > 0) {
+        // eslint-disable-next-line no-console
+        console.log(`scheduler failed ${swept} stale attempt(s)`);
       }
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -30,7 +41,9 @@ export async function startScheduler(): Promise<void> {
   }, config.schedulerIntervalMs);
 
   // eslint-disable-next-line no-console
-  console.log(`scheduler started (interval=${config.schedulerIntervalMs}ms)`);
+  console.log(
+    `scheduler started (interval=${config.schedulerIntervalMs}ms, stale=${config.staleAttemptMinutes}m)`,
+  );
 }
 
 const isMain = process.argv[1]?.endsWith('index.js');

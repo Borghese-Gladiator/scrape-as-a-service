@@ -103,6 +103,37 @@ Then `docker compose build web && docker compose up -d`.
 5. **Schedule:** on a definition, add a cron schedule (with timezone) and enable
    it. When it comes due the `scheduler` creates a `SCHEDULE`-triggered run that
    the worker picks up.
+6. **Stale run:** start a run, then `docker compose kill worker`. The attempt
+   stops its heartbeat. Within `STALE_ATTEMPT_MINUTES` the scheduler marks the
+   attempt and the run `FAILED` with the error code `STALE`.
+
+## Run reliability
+
+Every run reaches a terminal status, through one of four paths.
+
+| Failure | Mechanism |
+| --- | --- |
+| A scrape that never settles | `RUN_TIMEOUT_MS` bounds the scrape inside the worker. The run fails with the code `TIMEOUT`. |
+| A worker that dies mid-job | The attempt stops its 15-second heartbeat. The scheduler sweeper fails the attempt and the run with the code `STALE` after `STALE_ATTEMPT_MINUTES`. |
+| Two schedulers, one due schedule | The poller claims the schedule with `SELECT ... FOR UPDATE SKIP LOCKED`, and creates the run and advances the schedule in that same transaction. Exactly one run is created. |
+| A scheduler outage | The schedule's `catchUp` policy decides. `skip` forgets the missed windows. `runOnce` records one run against the oldest missed window, then resumes the cadence. |
+
+Every failure carries a code from a closed set: `TIMEOUT`, `SELECTOR_NOT_FOUND`,
+`NAVIGATION_FAILED`, `AUTH_FAILED`, `LIMIT_EXCEEDED`, `STORAGE_FAILED`, `STALE`,
+`UNKNOWN`. The code is stored on the attempt as `error_code`.
+
+`POST /schedules` accepts `catchUp` with the value `skip` (the default) or
+`runOnce`.
+
+Each worker process launches one Chromium and reuses it. Each job takes its own
+browser context, which stays the isolation boundary.
+
+To check the sweeper against a real database:
+
+```bash
+npm run build
+node scripts/manual/phase-3-stale.mjs "$DATABASE_URL"
+```
 
 ## Local development (without Docker for the app services)
 
@@ -150,6 +181,8 @@ All configuration is read from the environment (see `.env.example`):
 | `API_PORT` / `WEB_PORT` | Service ports |
 | `SCHEDULER_INTERVAL_MS` | Scheduler poll interval |
 | `WORKER_CONCURRENCY` | Worker job concurrency |
+| `RUN_TIMEOUT_MS` | Hard limit on one scrape, in milliseconds (default `120000`) |
+| `STALE_ATTEMPT_MINUTES` | How long an attempt may go without a heartbeat before the scheduler fails it (default `10`) |
 | `NEXT_PUBLIC_API_BASE_URL` | Base URL the web frontend uses to reach the `api` service (falls back to `API_BASE_URL`, then `http://localhost:4000`) |
 
 ## Web frontend (`apps/web`)

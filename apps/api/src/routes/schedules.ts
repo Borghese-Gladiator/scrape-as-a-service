@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import type { Pool } from 'pg';
 import {
+  CATCH_UP_POLICIES,
   createSchedule,
   getDefinition,
+  isCatchUpPolicy,
   listSchedules,
   setScheduleEnabled,
 } from '@scraper/db';
@@ -38,6 +40,10 @@ export function schedulesRouter(pool: Pool): Router {
         throw new HttpError(400, 'timezone is required');
       }
       const enabled = body?.enabled === undefined ? true : Boolean(body.enabled);
+      const catchUp = body?.catchUp ?? 'skip';
+      if (!isCatchUpPolicy(catchUp)) {
+        throw new HttpError(400, `catchUp must be one of: ${CATCH_UP_POLICIES.join(', ')}`);
+      }
 
       const definition = await getDefinition(pool, definitionId);
       if (!definition) {
@@ -53,7 +59,7 @@ export function schedulesRouter(pool: Pool): Router {
 
       const schedule = await createSchedule(
         pool,
-        { definitionId, cron, timezone, enabled },
+        { definitionId, cron, timezone, enabled, catchUp },
         nextRunAt,
       );
       res.status(201).json(schedule);

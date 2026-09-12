@@ -13,6 +13,8 @@ export interface AppConfig {
   webPort: number;
   schedulerIntervalMs: number;
   workerConcurrency: number;
+  runTimeoutMs: number;
+  staleAttemptMinutes: number;
 }
 
 function required(env: NodeJS.ProcessEnv, key: string): string {
@@ -56,5 +58,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webPort: toInt(optional(env, 'WEB_PORT', '3000'), 'WEB_PORT'),
     schedulerIntervalMs: toInt(optional(env, 'SCHEDULER_INTERVAL_MS', '10000'), 'SCHEDULER_INTERVAL_MS'),
     workerConcurrency: toInt(optional(env, 'WORKER_CONCURRENCY', '4'), 'WORKER_CONCURRENCY'),
+    runTimeoutMs: toInt(optional(env, 'RUN_TIMEOUT_MS', '120000'), 'RUN_TIMEOUT_MS'),
+    staleAttemptMinutes: toInt(
+      optional(env, 'STALE_ATTEMPT_MINUTES', '10'),
+      'STALE_ATTEMPT_MINUTES',
+    ),
   };
 }

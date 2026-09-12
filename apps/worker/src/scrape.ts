@@ -1,11 +1,41 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Browser } from 'playwright';
-import type { ScrapeConfig, ScrapeResult } from '@scraper/shared';
+import type { Browser, BrowserContext } from 'playwright';
+import { ScrapeError, type ScrapeConfig, type ScrapeResult } from '@scraper/shared';
 
 function needsRecording(config: ScrapeConfig): boolean {
   return config.artifacts.includes('WEBM');
+}
+
+export interface ScrapeSession {
+  context: BrowserContext;
+  recordDir?: string;
+}
+
+/**
+ * The context and its temporary recording directory are opened and closed by
+ * the caller, not by runScrape, so that a caller that abandons a scrape (a run
+ * timeout) can still release the context.
+ */
+export async function openScrapeSession(
+  browser: Browser,
+  config: ScrapeConfig,
+): Promise<ScrapeSession> {
+  const recordDir = needsRecording(config)
+    ? await mkdtemp(join(tmpdir(), 'scrape-rec-'))
+    : undefined;
+  const context = await browser.newContext(
+    recordDir ? { recordVideo: { dir: recordDir } } : {},
+  );
+  return recordDir ? { context, recordDir } : { context };
+}
+
+export async function closeScrapeSession(session: ScrapeSession): Promise<void> {
+  await session.context.close().catch(() => {});
+  if (session.recordDir) {
+    await rm(session.recordDir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 /**
@@ -14,23 +44,22 @@ function needsRecording(config: ScrapeConfig): boolean {
  * optional attribute reads.
  */
 export async function runScrape(
-  browser: Browser,
+  session: ScrapeSession,
   url: string,
   config: ScrapeConfig,
 ): Promise<ScrapeResult> {
   const recording = needsRecording(config);
-  let recordDir: string | undefined;
-  if (recording) {
-    recordDir = await mkdtemp(join(tmpdir(), 'scrape-rec-'));
-  }
-
-  const context = await browser.newContext(
-    recordDir ? { recordVideo: { dir: recordDir } } : {},
-  );
+  const { context } = session;
   const page = await context.newPage();
 
   try {
-    await page.goto(url, { waitUntil: 'load' });
+    try {
+      await page.goto(url, { waitUntil: 'load' });
+    } catch (err) {
+      throw new ScrapeError('NAVIGATION_FAILED', `navigation to ${url} failed`, {
+        cause: err,
+      });
+    }
     if (config.waitFor) {
       await page.waitForSelector(config.waitFor);
     }
@@ -58,8 +87,6 @@ export async function runScrape(
     return result;
   } finally {
     if (!page.isClosed()) await page.close().catch(() => {});
-    await context.close().catch(() => {});
-    if (recordDir) await rm(recordDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 

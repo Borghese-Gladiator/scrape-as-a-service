@@ -10,6 +10,7 @@ import {
   SCRAPE_QUEUE_NAME,
   type ScrapeJobData,
 } from '@scraper/shared';
+import { createBrowserPool } from './browser.js';
 import { processRun } from './process-run.js';
 
 export async function startWorker(): Promise<void> {
@@ -19,6 +20,7 @@ export async function startWorker(): Promise<void> {
   await storage.ensureBucket();
 
   const workerId = `${hostname()}-${randomUUID()}`;
+  const browsers = createBrowserPool(() => chromium.launch());
 
   const worker = new Worker<ScrapeJobData>(
     SCRAPE_QUEUE_NAME,
@@ -27,7 +29,8 @@ export async function startWorker(): Promise<void> {
         pool,
         storage,
         workerId,
-        launchBrowser: () => chromium.launch(),
+        getBrowser: () => browsers.get(),
+        runTimeoutMs: config.runTimeoutMs,
       });
     },
     {
@@ -43,8 +46,17 @@ export async function startWorker(): Promise<void> {
     console.error(`job ${job?.id} failed: ${err.message}`);
   });
 
+  const shutdown = async () => {
+    await worker.close().catch(() => {});
+    await browsers.close();
+  };
+  process.once('SIGTERM', () => void shutdown());
+  process.once('SIGINT', () => void shutdown());
+
   // eslint-disable-next-line no-console
-  console.log(`worker ${workerId} started (concurrency=${config.workerConcurrency})`);
+  console.log(
+    `worker ${workerId} started (concurrency=${config.workerConcurrency}, timeout=${config.runTimeoutMs}ms)`,
+  );
 }
 
 const isMain = process.argv[1]?.endsWith('index.js');
