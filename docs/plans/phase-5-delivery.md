@@ -145,7 +145,25 @@ skips a deleted one, so a stale schedule cannot keep creating runs.
 
 `apps/scheduler/src/index.ts` runs the sweeper once at start and then every hour.
 
-### E. The web client
+### E. `size_bytes` comes back as a string
+
+A pre-existing bug on the artifact surface that this phase owns. `size_bytes` is
+a Postgres `bigint`, and the `pg` driver maps a bigint to a JavaScript string to
+protect precision. Both `packages/db/src/types.ts` and
+`apps/web/src/lib/types.ts` declare `number`, so both types were wrong, and
+`GET /runs/:id` returned `"size_bytes": "17660"`. The run page rendered right
+only because JavaScript coerces the string.
+
+The fix maps the column in `packages/db/src/repositories/artifacts.ts`, on the
+way out of the repository, so every caller gets the declared type and no caller
+needs to know about the driver. An artifact size never approaches
+`Number.MAX_SAFE_INTEGER`, so a plain `Number(...)` is lossless and no bigint
+library is needed.
+
+`artifacts.size_bytes` is the only `bigint` in the schema, so no other
+repository has the same problem.
+
+### F. The web client
 
 - `getDefinition` calls `GET /definitions/:id` instead of listing every row.
 - `listDefinitions` and `listRuns` read `items` out of the paginated body.
@@ -165,6 +183,7 @@ The `ApiClient` interface still returns arrays, so no component changes.
 | `apps/api/src/__tests__/run-actions.route.test.ts` | `it.each` over a `QUEUED` run and a `RUNNING` run: the queued case removes the BullMQ job; both mark the run `FAILED` with the error code `CANCELLED`. A finished run gives 409. `rerun` creates a second run and enqueues it. |
 | `apps/scheduler/src/__tests__/retention.test.ts` | A fake clock and a fake storage. Objects are removed before the row is deleted; a run inside the window survives; `RETENTION_DAYS=0` deletes nothing. |
 | `apps/worker/src/__tests__/run-local.test.ts` | The local runner against the Phase 2 fixture site, modeled with `FakeContext`. It writes every artifact to a real temporary folder, prints one line per artifact, and exits non-zero with the error code when a step fails. |
+| `packages/db/src/__tests__/artifacts.test.ts` | `size_bytes` comes back as a number from `insertArtifact`, `listArtifacts` and `getArtifact`, over a fake that returns the bigint string the driver returns. |
 
 ### Manual — `scripts/manual/phase-5-export.mjs`
 
