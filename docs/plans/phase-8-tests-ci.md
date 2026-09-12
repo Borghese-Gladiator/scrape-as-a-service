@@ -62,19 +62,15 @@ The test:
 1. Serves a fixture page with `node:http` on an ephemeral port.
 2. Starts the real Express app on an ephemeral port, against real Postgres,
    real Redis, and real MinIO.
-3. Sends a cross-origin preflight `OPTIONS /definitions` and asserts the
-   `Access-Control-Allow-Origin` header. This is the CORS guard.
-4. `POST /definitions` with an `Origin` header, and asserts the response
-   carries `Access-Control-Allow-Origin`.
-5. `POST /runs` to trigger a run.
-6. Runs one real BullMQ worker with a real Chromium browser.
-7. Polls `GET /runs/:id` until the status is terminal.
-8. `GET /runs/:id/artifacts`, then `GET /artifacts/:id/download`, and asserts
+3. `POST /definitions` to create a definition.
+4. `POST /runs` to trigger a run.
+5. Runs one real BullMQ worker with a real Chromium browser.
+6. Polls `GET /runs/:id` until the status is terminal.
+7. `GET /runs/:id/artifacts`, then `GET /artifacts/:id/download`, and asserts
    the downloaded bytes.
 
-CORS note: `apps/api/src/server.ts` on `main` has no CORS middleware, so step 3
-cannot pass as the code stands. This phase adds the minimal `cors` middleware so
-the branch is green. Phase 1 owns the same change, so expect a conflict in
+Scope: the API contract only. CORS coverage belongs to Phase 1, which adds the
+middleware and a preflight route test. This phase does not change
 `apps/api/src/server.ts`.
 
 ### 3. CI (TODO 6.4)

@@ -31,7 +31,6 @@ const FIXTURE_HTML = `<!doctype html>
   </body>
 </html>`;
 
-const BROWSER_ORIGIN = 'http://localhost:3000';
 const QUEUE_NAME = `scrape-e2e-${randomUUID()}`;
 
 function listen(server: Server): Promise<number> {
@@ -117,25 +116,10 @@ describeIntegration('end to end: definition to artifact download', () => {
     await pool?.end();
   });
 
-  it('answers a cross-origin preflight for POST /definitions', async () => {
-    const response = await fetch(`${apiBase}/definitions`, {
-      method: 'OPTIONS',
-      headers: {
-        Origin: BROWSER_ORIGIN,
-        'Access-Control-Request-Method': 'POST',
-        'Access-Control-Request-Headers': 'content-type',
-      },
-    });
-
-    expect(response.status).toBeLessThan(300);
-    expect(response.headers.get('access-control-allow-origin')).toBeTruthy();
-    expect(response.headers.get('access-control-allow-methods')).toContain('POST');
-  });
-
   it('creates a definition, runs it, and downloads every artifact', async () => {
     const createResponse = await fetch(`${apiBase}/definitions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Origin: BROWSER_ORIGIN },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: 'e2e fixture',
         url: fixtureUrl,
@@ -152,12 +136,11 @@ describeIntegration('end to end: definition to artifact download', () => {
     });
 
     expect(createResponse.status).toBe(201);
-    expect(createResponse.headers.get('access-control-allow-origin')).toBeTruthy();
     const definition = (await createResponse.json()) as { id: string };
 
     const runResponse = await fetch(`${apiBase}/runs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Origin: BROWSER_ORIGIN },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ definitionId: definition.id }),
     });
     expect(runResponse.status).toBe(201);

@@ -233,7 +233,6 @@ All configuration is read from the environment (see `.env.example`):
 | `REDIS_URL` | Redis connection for BullMQ |
 | `MINIO_ENDPOINT` / `MINIO_PORT` / `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` / `MINIO_BUCKET` / `MINIO_USE_SSL` | Object storage |
 | `API_PORT` / `WEB_PORT` | Service ports |
-| `CORS_ORIGINS` | Comma-separated origin allowlist for the API. Unset allows any origin |
 | `SCHEDULER_INTERVAL_MS` | Scheduler poll interval |
 | `WORKER_CONCURRENCY` | Worker job concurrency |
 | `NEXT_PUBLIC_API_BASE_URL` | Base URL the web frontend uses to reach the `api` service (falls back to `API_BASE_URL`, then `http://localhost:4000`) |
