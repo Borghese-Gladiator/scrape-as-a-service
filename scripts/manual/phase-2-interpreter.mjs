@@ -17,6 +17,10 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..');
 
+// Phase 4 put an SSRF guard on every navigation. The fixture server listens on
+// 127.0.0.1, which the guard rejects by default.
+process.env.ALLOW_PRIVATE_URLS = 'true';
+
 // playwright is a dependency of the worker workspace, not of the repo root.
 const requireFromWorker = createRequire(join(repoRoot, 'apps/worker/package.json'));
 const { chromium } = requireFromWorker('playwright');

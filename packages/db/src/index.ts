@@ -6,3 +6,4 @@ export * from './repositories/schedules.js';
 export * from './repositories/runs.js';
 export * from './repositories/attempts.js';
 export * from './repositories/artifacts.js';
+export * from './repositories/secrets.js';

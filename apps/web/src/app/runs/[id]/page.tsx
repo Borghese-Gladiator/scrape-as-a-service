@@ -22,10 +22,26 @@ export default async function RunDetailPage({ params }: { params: { id: string }
     );
   }
 
+  // A browser cannot put the API key on an `<a href>`, so the link is resolved
+  // to a presigned object URL here, where the key is available.
+  const links = new Map<string, string>();
+  for (const artifact of run.artifacts) {
+    try {
+      links.set(artifact.id, await api.artifactPresignedUrl(artifact.id));
+    } catch {
+      links.set(artifact.id, api.artifactDownloadUrl(artifact.id));
+    }
+  }
+
   return (
     <div>
       <h1>Run {run.id.slice(0, 8)}</h1>
-      <RunDetail run={run} artifactDownloadUrl={(artifactId) => api.artifactDownloadUrl(artifactId)} />
+      <RunDetail
+        run={run}
+        artifactDownloadUrl={(artifactId) =>
+          links.get(artifactId) ?? api.artifactDownloadUrl(artifactId)
+        }
+      />
     </div>
   );
 }

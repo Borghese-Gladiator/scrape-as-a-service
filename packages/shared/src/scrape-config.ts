@@ -48,7 +48,10 @@ export type AuthConfig =
   | { mode: 'none' }
   | { mode: 'storageState'; secretRef: string }
   | { mode: 'cdp'; endpointUrl: string }
+  | { mode: 'chromeProfile'; userDataDir: string; profileDirectory?: string }
   | { mode: 'login'; secretRef?: string; steps: Step[] };
+
+export const AUTH_MODES = ['none', 'storageState', 'cdp', 'chromeProfile', 'login'] as const;
 
 export type Step =
   | { op: 'goto'; url?: string; waitUntil?: WaitUntil }
@@ -312,11 +315,7 @@ function parseStep(input: unknown, path: string): Step {
 
 function parseAuth(input: unknown, path: string): AuthConfig {
   if (!isRecord(input)) fail(`${path} must be an object`);
-  const mode = requireEnum(
-    input.mode,
-    ['none', 'storageState', 'cdp', 'login'] as const,
-    `${path}.mode`,
-  );
+  const mode = requireEnum(input.mode, AUTH_MODES, `${path}.mode`);
   switch (mode) {
     case 'none':
       return { mode };
@@ -324,6 +323,18 @@ function parseAuth(input: unknown, path: string): AuthConfig {
       return { mode, secretRef: requireString(input.secretRef, `${path}.secretRef`) };
     case 'cdp':
       return { mode, endpointUrl: requireString(input.endpointUrl, `${path}.endpointUrl`) };
+    case 'chromeProfile': {
+      const auth: AuthConfig = {
+        mode,
+        userDataDir: requireString(input.userDataDir, `${path}.userDataDir`),
+      };
+      const profileDirectory = optionalString(
+        input.profileDirectory,
+        `${path}.profileDirectory`,
+      );
+      if (profileDirectory !== undefined) auth.profileDirectory = profileDirectory;
+      return auth;
+    }
     case 'login': {
       const auth: AuthConfig = { mode, steps: parseNestedSteps(input.steps, `${path}.steps`) };
       const secretRef = optionalString(input.secretRef, `${path}.secretRef`);
@@ -433,4 +444,31 @@ export function validateScrapeConfig(input: unknown): ScrapeConfig {
 /** Fill every missing limit from `DEFAULT_LIMITS`. */
 export function resolveLimits(limits: Limits | undefined): Required<Limits> {
   return { ...DEFAULT_LIMITS, ...limits };
+}
+
+function collectStepSecretRefs(steps: Step[], found: Set<string>): void {
+  for (const step of steps) {
+    if (step.op === 'fill' && step.valueFrom !== undefined) found.add(step.valueFrom);
+    if (step.op === 'forEach' || step.op === 'openLink' || step.op === 'paginate') {
+      collectStepSecretRefs(step.steps, found);
+    }
+  }
+}
+
+/**
+ * Every secret name that a config needs, from `auth` and from every nested
+ * `fill.valueFrom`. The worker resolves this list once before a run.
+ */
+export function collectSecretRefs(config: ScrapeConfig): string[] {
+  const found = new Set<string>();
+  const auth = config.auth;
+  if (auth) {
+    if (auth.mode === 'storageState') found.add(auth.secretRef);
+    if (auth.mode === 'login') {
+      if (auth.secretRef !== undefined) found.add(auth.secretRef);
+      collectStepSecretRefs(auth.steps, found);
+    }
+  }
+  collectStepSecretRefs(config.steps, found);
+  return [...found];
 }

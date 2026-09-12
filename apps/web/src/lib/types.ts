@@ -34,6 +34,7 @@ export type AuthConfig =
   | { mode: 'none' }
   | { mode: 'storageState'; secretRef: string }
   | { mode: 'cdp'; endpointUrl: string }
+  | { mode: 'chromeProfile'; userDataDir: string; profileDirectory?: string }
   | { mode: 'login'; secretRef?: string; steps: Step[] };
 
 export type Step =
@@ -164,6 +165,8 @@ export interface ApiClient {
   getRun(id: string): Promise<RunDetail>;
   listArtifacts(runId: string): Promise<Artifact[]>;
   artifactDownloadUrl(artifactId: string): string;
+  /** A short-lived object URL. The browser cannot send the API key on a link. */
+  artifactPresignedUrl(artifactId: string): Promise<string>;
 }
 
 export const RUN_COMPLETE_STATUSES: readonly RunStatus[] = ['SUCCEEDED', 'FAILED'];
