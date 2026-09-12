@@ -157,9 +157,17 @@ definition, a run, and a RUNNING attempt with an old heartbeat. It runs the
 sweeper once. It prints the run status and the attempt status. It exits
 non-zero when the run is not FAILED with the code `STALE`.
 
+`scripts/manual/phase-3-scheduler.mjs` covers the other body of new SQL, which
+the unit suite never executes: the catch-up policies, `claimDueSchedule` with
+`FOR UPDATE SKIP LOCKED` against two real connections, two concurrent pollers,
+`touchAttempt`, and `findStaleAttempts`. It also prints the plan of the stale
+query, to show that the partial index is used.
+
 ```bash
 npm run build
+npm run migrate
 node scripts/manual/phase-3-stale.mjs postgres://postgres:postgres@localhost:5432/scraper
+node scripts/manual/phase-3-scheduler.mjs postgres://postgres:postgres@localhost:5432/scraper
 ```
 
 ### Verification
@@ -168,3 +176,8 @@ node scripts/manual/phase-3-stale.mjs postgres://postgres:postgres@localhost:543
 npm run typecheck
 npm test
 ```
+
+Both manual scripts ran against Postgres 16 and passed. The migration applied
+twice with no error, the partial index serves the stale query through an index
+scan, and every check in the scheduler script passed. The real database
+required no change to the implementation.

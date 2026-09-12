@@ -128,12 +128,17 @@ Every failure carries a code from a closed set: `TIMEOUT`, `SELECTOR_NOT_FOUND`,
 Each worker process launches one Chromium and reuses it. Each job takes its own
 browser context, which stays the isolation boundary.
 
-To check the sweeper against a real database:
+To check the sweeper, the scheduler claim, and the catch-up policies against a
+real database:
 
 ```bash
 npm run build
+npm run migrate
 node scripts/manual/phase-3-stale.mjs "$DATABASE_URL"
+node scripts/manual/phase-3-scheduler.mjs "$DATABASE_URL"
 ```
+
+Both scripts remove every row that they write.
 
 ## Local development (without Docker for the app services)
 
