@@ -42,10 +42,28 @@ function resolvePublicBaseUrl(explicit?: string): string {
   return (publicUrl && publicUrl.length > 0 ? publicUrl : DEFAULT_BASE_URL).replace(/\/$/, '');
 }
 
+/**
+ * The API needs `X-API-Key` on every route except `/health`. Server-side calls
+ * read the server-only `API_KEY`. The browser has no way to read that, so it
+ * falls back to `NEXT_PUBLIC_API_KEY`, which is baked into the bundle and is
+ * therefore visible to anybody who loads the page. See the README.
+ */
+function apiKeyHeader(): Record<string, string> {
+  const key =
+    typeof window === 'undefined'
+      ? (process.env.API_KEY ?? process.env.NEXT_PUBLIC_API_KEY)
+      : process.env.NEXT_PUBLIC_API_KEY;
+  return key && key.length > 0 ? { 'X-API-Key': key } : {};
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     cache: 'no-store',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...apiKeyHeader(),
+      ...(init?.headers ?? {}),
+    },
     ...init,
   });
   if (!res.ok) {
@@ -117,6 +135,12 @@ export function getApiClient(baseUrl?: string): ApiClient {
     },
     runArchiveUrl(runId: string) {
       return `${publicBase}/runs/${encodeURIComponent(runId)}/artifacts.zip`;
+    },
+    async artifactPresignedUrl(artifactId: string) {
+      const body = await request<{ url: string }>(
+        `${base}/artifacts/${encodeURIComponent(artifactId)}/url`,
+      );
+      return body.url;
     },
   };
 }

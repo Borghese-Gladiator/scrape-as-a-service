@@ -5,6 +5,10 @@ WORKDIR /app
 ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:4000
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 
+# The API key for browser calls is inlined the same way, so it is public.
+ARG NEXT_PUBLIC_API_KEY=
+ENV NEXT_PUBLIC_API_KEY=${NEXT_PUBLIC_API_KEY}
+
 # All workspace manifests are required for a deterministic `npm ci` against the
 # root lockfile.
 COPY package.json package-lock.json ./

@@ -8,7 +8,7 @@ import {
   updateDefinition,
   type UpdateDefinitionInput,
 } from '@scraper/db';
-import { validateScrapeConfig } from '@scraper/shared';
+import { assertSafeUrl, validateScrapeConfig } from '@scraper/shared';
 import { asyncHandler, HttpError } from '../http.js';
 import { pageQuery } from '../query.js';
 
@@ -20,7 +20,17 @@ function parseConfig(input: unknown) {
   }
 }
 
-export function definitionsRouter(pool: Pool): Router {
+export type AssertUrl = (url: string) => Promise<void>;
+
+async function checkUrl(assertUrl: AssertUrl, url: string): Promise<void> {
+  try {
+    await assertUrl(url);
+  } catch (err) {
+    throw new HttpError(400, (err as Error).message);
+  }
+}
+
+export function definitionsRouter(pool: Pool, assertUrl: AssertUrl = assertSafeUrl): Router {
   const router = Router();
 
   router.get(
@@ -53,6 +63,7 @@ export function definitionsRouter(pool: Pool): Router {
       if (typeof url !== 'string' || url.length === 0) {
         throw new HttpError(400, 'url is required');
       }
+      await checkUrl(assertUrl, url);
       const config = parseConfig(body?.config);
       const definition = await createDefinition(pool, { name, url, config });
       res.status(201).json(definition);
@@ -75,6 +86,7 @@ export function definitionsRouter(pool: Pool): Router {
         if (typeof body.url !== 'string' || body.url.length === 0) {
           throw new HttpError(400, 'url must be a non-empty string');
         }
+        await checkUrl(assertUrl, body.url);
         input.url = body.url;
       }
       if (body.config !== undefined) {

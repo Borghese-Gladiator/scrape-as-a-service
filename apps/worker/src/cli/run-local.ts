@@ -2,10 +2,10 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import type { Browser } from 'playwright';
 import type { ScrapeConfig } from '@scraper/shared';
-import { validateScrapeConfig } from '@scraper/shared';
+import { assertSafeUrl, validateScrapeConfig } from '@scraper/shared';
 import { artifactFilename } from '../artifacts.js';
 import { StepError } from '../interpreter.js';
-import { runScrape } from '../scrape.js';
+import { runScrape, type ScrapeDeps } from '../scrape.js';
 import { integerFlag, parseArgs, requireFlag } from './args.js';
 
 const USAGE = `usage: npm run run-local -- --definition <file.json> --out <folder> [--url <url>] [--headed] [--timeout <ms>]
@@ -13,11 +13,14 @@ const USAGE = `usage: npm run run-local -- --definition <file.json> --out <folde
 Run one scrape definition end to end with a real browser. It needs no Postgres,
 no Redis, and no MinIO: every artifact lands in the output folder.
 
-  --definition  A JSON file. Either { name?, url, config } or a bare config.
-  --out         The output folder. It is created when it is missing.
-  --url         Override the URL that the definition carries.
-  --headed      Show the browser. The default is headless.
-  --timeout     Override limits.maxDurationMs, in milliseconds.`;
+  --definition     A JSON file. Either { name?, url, config } or a bare config.
+  --out            The output folder. It is created when it is missing.
+  --url            Override the URL that the definition carries.
+  --headed         Show the browser. The default is headless.
+  --timeout        Override limits.maxDurationMs, in milliseconds.
+  --allow-private  Let the run reach a loopback or private URL. Fixtures need it.
+  --allow-cdp      Let auth.mode=cdp attach to a Chrome that already runs.
+  --allow-profile  Let auth.mode=chromeProfile copy a Chrome profile.`;
 
 export interface RunLocalOptions {
   definitionPath: string;
@@ -25,6 +28,10 @@ export interface RunLocalOptions {
   url?: string;
   headed?: boolean;
   timeoutMs?: number;
+  /** Turn the address half of the SSRF guard off. A local fixture needs it. */
+  allowPrivateUrls?: boolean;
+  allowCdp?: boolean;
+  allowLocalProfile?: boolean;
 }
 
 export interface RunLocalDeps {
@@ -113,10 +120,17 @@ export async function runLocal(
     : resolve(process.cwd(), options.outDir);
   await mkdir(outDir, { recursive: true });
 
+  const scrapeDeps: ScrapeDeps = {
+    allowCdp: options.allowCdp === true,
+    allowLocalProfile: options.allowLocalProfile === true,
+  };
+  const assertUrl = (target: string) =>
+    assertSafeUrl(target, { allowPrivate: options.allowPrivateUrls === true });
+
   const browser = await deps.launchBrowser(options.headed === true);
   const files: RunLocalResult['files'] = [];
   try {
-    const result = await runScrape(browser, url, config);
+    const result = await runScrape(browser, url, config, { assertUrl }, scrapeDeps);
     for (const artifact of result.artifacts) {
       const name = artifactFilename(config, artifact.name);
       await writeFile(join(outDir, name), artifact.body);
@@ -151,6 +165,9 @@ export async function main(argv: string[], deps: RunLocalDeps): Promise<number> 
       definitionPath: requireFlag(args, 'definition'),
       outDir: requireFlag(args, 'out'),
       headed: args.switches.has('headed'),
+      allowPrivateUrls: args.switches.has('allow-private'),
+      allowCdp: args.switches.has('allow-cdp'),
+      allowLocalProfile: args.switches.has('allow-profile'),
     };
     const url = args.flags.url;
     if (url !== undefined) options.url = url;

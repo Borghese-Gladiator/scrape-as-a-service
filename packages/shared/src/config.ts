@@ -15,6 +15,11 @@ export interface AppConfig {
   workerConcurrency: number;
   /** Delete runs older than this many days. 0 disables the retention sweeper. */
   retentionDays: number;
+  /** Empty means the API key check is off. `startApi` refuses that in production. */
+  apiKey: string;
+  allowCdp: boolean;
+  allowLocalProfile: boolean;
+  allowPrivateUrls: boolean;
 }
 
 function required(env: NodeJS.ProcessEnv, key: string): string {
@@ -59,5 +64,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     schedulerIntervalMs: toInt(optional(env, 'SCHEDULER_INTERVAL_MS', '10000'), 'SCHEDULER_INTERVAL_MS'),
     workerConcurrency: toInt(optional(env, 'WORKER_CONCURRENCY', '4'), 'WORKER_CONCURRENCY'),
     retentionDays: toInt(optional(env, 'RETENTION_DAYS', '30'), 'RETENTION_DAYS'),
+    apiKey: optional(env, 'API_KEY', ''),
+    allowCdp: toBool(optional(env, 'ALLOW_CDP', 'false')),
+    allowLocalProfile: toBool(optional(env, 'ALLOW_LOCAL_PROFILE', 'false')),
+    allowPrivateUrls: toBool(optional(env, 'ALLOW_PRIVATE_URLS', 'false')),
   };
 }

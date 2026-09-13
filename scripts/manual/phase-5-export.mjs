@@ -119,6 +119,8 @@ async function partOneLocalRunner(workDir, baseUrl) {
     definitionPath,
     '--out',
     outDir,
+    // The fixture serves on 127.0.0.1, which the Phase 4 SSRF guard blocks.
+    '--allow-private',
   ]);
   check(code === 0, `the local runner exited with ${code}`);
 

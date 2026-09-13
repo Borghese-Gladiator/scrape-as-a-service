@@ -97,7 +97,7 @@ definition.
 ```ts
 interface ScrapeConfig {
   version: 2;
-  auth?: AuthConfig;   // Phase 4 executes this; the validator accepts it today
+  auth?: AuthConfig;   // see Security below
   steps: Step[];
   limits?: Limits;
   record?: boolean;    // record the context as one recording.webm artifact
@@ -322,6 +322,183 @@ hour. It removes the storage objects first and the rows second, so a failure
 between the two leaves a row for the next sweep instead of an orphan object in
 MinIO. Set `RETENTION_DAYS=0` to keep everything.
 
+## Security
+
+### The API key
+
+Every route except `/health` needs the `X-API-Key` header. The value comes from
+`API_KEY`.
+
+```bash
+curl -H "X-API-Key: $API_KEY" http://localhost:4000/definitions
+curl http://localhost:4000/health          # no key needed
+```
+
+When `API_KEY` is empty the API runs open and prints a warning on boot. With
+`NODE_ENV=production` an empty `API_KEY` stops the API from starting. The
+comparison is timing safe.
+
+**How the browser gets a key.** A server-rendered page reads the server-only
+`API_KEY`, which never reaches the bundle. A client component runs in the
+browser and cannot read it, so it falls back to `NEXT_PUBLIC_API_KEY`. Next.js
+inlines that value at build time, so **anybody who loads the page can read it**.
+Treat it as a shared local-development key, never as a production credential.
+The real fix is a Next.js route handler that proxies the API so the browser
+never holds a key; that is TODO 7.2 and it is not in this phase.
+
+### The secret store
+
+A secret holds a credential that a scrape needs: a Playwright `storageState`
+blob, or a password that `fill.valueFrom` names.
+
+```bash
+curl -X POST http://localhost:4000/secrets \
+  -H "X-API-Key: $API_KEY" -H 'Content-Type: application/json' \
+  -d '{"name":"court_session","value":"{\"cookies\":[]}"}'
+
+curl -H "X-API-Key: $API_KEY" http://localhost:4000/secrets
+curl -X DELETE -H "X-API-Key: $API_KEY" http://localhost:4000/secrets/<id>
+```
+
+`POST /secrets` encrypts the value with AES-256-GCM under
+`SECRET_ENCRYPTION_KEY` and stores the ciphertext. **The API never returns a
+plaintext secret and never returns a ciphertext.** `GET /secrets` returns names
+and timestamps only. `GET /definitions` returns the config, which holds a secret
+*name*, never a value. Only the worker decrypts, and it decrypts one run's
+secrets one time.
+
+`SECRET_ENCRYPTION_KEY` must decode to exactly 32 bytes from base64 or from hex.
+A wrong length fails loudly on the first use. Generate one with
+`openssl rand -base64 32`. Lose it and every stored secret is unreadable; there
+is no recovery.
+
+### The four auth modes
+
+```ts
+type AuthConfig =
+  | { mode: 'none' }
+  | { mode: 'storageState'; secretRef: string }
+  | { mode: 'cdp'; endpointUrl: string }
+  | { mode: 'chromeProfile'; userDataDir: string; profileDirectory?: string }
+  | { mode: 'login'; secretRef?: string; steps: Step[] };
+```
+
+| Mode | Where it runs | What it does |
+| --- | --- | --- |
+| `none` | anywhere | A fresh, empty context. This is the default. |
+| `storageState` | anywhere | Reads the named secret, parses it as a Playwright `storageState` blob, and passes it to `browser.newContext`. **This is the production path.** |
+| `cdp` | local worker | Attaches to a Chrome that the user already runs, so the user's live cookies apply. |
+| `chromeProfile` | local worker | Copies the user's Chrome profile and launches a persistent context on the copy. **The most reliable path for a one-off job on the user's own machine.** |
+| `login` | anywhere | Replays declarative steps to obtain a session, then saves it to the named secret for reuse. |
+
+A secret that a config names but the store does not hold fails the run with
+`AUTH_FAILED`.
+
+**`cdp`.** Start Chrome with a debug port, then point the definition at it:
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222
+```
+
+```json
+{ "mode": "cdp", "endpointUrl": "http://127.0.0.1:9222" }
+```
+
+It needs `ALLOW_CDP=true` on the worker. The worker reuses the first context the
+browser already has, so the user's session applies. It never closes a browser it
+did not launch: it closes only the pages the run opened.
+
+**This mode cannot work from inside the Docker worker.** `127.0.0.1` in the
+container is the container, not the host, and `host.docker.internal` still needs
+Chrome to listen on every interface, which exposes a full debug port on the
+network. Run the worker on the host instead:
+
+```bash
+ALLOW_CDP=true npm run dev --workspace @scraper/worker
+```
+
+**`chromeProfile`.** Chrome holds an exclusive lock on a live profile, so the
+worker copies the named profile to a temporary directory first, launches a
+persistent context on the copy, and deletes the copy afterwards. The copy skips
+the cache directories, which are large and useless to a session.
+
+```json
+{
+  "mode": "chromeProfile",
+  "userDataDir": "/Users/you/Library/Application Support/Google/Chrome",
+  "profileDirectory": "Default"
+}
+```
+
+It needs `ALLOW_LOCAL_PROFILE=true`, a separate flag from `ALLOW_CDP` because
+reading the profile off the disk is a larger grant than attaching to a debug
+port the user already opened. It needs a real Chrome (`channel: 'chrome'`), not
+the bundled Chromium, and it needs the host filesystem, so it is a local-worker
+mode as well.
+
+**`login`.** The steps are ordinary step verbs, so a password comes from the
+secret store through `fill.valueFrom`:
+
+```json
+{
+  "mode": "login",
+  "secretRef": "court_session",
+  "steps": [
+    { "op": "goto", "url": "https://app.example.com/login" },
+    { "op": "fill", "selector": "#user", "valueFrom": "court_user" },
+    { "op": "fill", "selector": "#pw", "valueFrom": "court_pw" },
+    { "op": "click", "selector": "button[type=submit]" },
+    { "op": "waitFor", "selector": "#dashboard" }
+  ]
+}
+```
+
+After the steps run, the worker writes `context.storageState()` back to
+`secretRef`. The next run reuses that stored session and skips the login steps,
+as long as the session still holds one cookie that has not expired. A session
+cookie does not count, because it dies with the browser that created it.
+
+### The URL guard
+
+`assertSafeUrl` allows `http` and `https` only. It resolves the host and rejects
+every address that is not globally routable: loopback, `10/8`, `172.16/12`,
+`192.168/16`, `169.254/16`, `100.64/10`, multicast, reserved, and the IPv6
+equivalents `::1`, `fe80::/10`, `fc00::/7` and `ff00::/8`. An IPv4-mapped IPv6
+address is judged as the IPv4 address it carries.
+
+The guard runs in two places:
+
+- `POST /definitions`, on the definition URL. A rejected URL returns 400.
+- The worker, on every `goto` and `openLink` target, and again on the URL the
+  page landed on. The second check matters because a public name can resolve to
+  a private address later, and because a redirect can end on a different host.
+
+`ALLOW_PRIVATE_URLS=true` turns the address check off. The scheme check stays on
+in every case. Set it only to scrape a local fixture site.
+
+### Artifact downloads
+
+`GET /artifacts/:id/download` streams the object and sits behind the API key
+like every other route. A browser cannot put a header on an `<a href>`, so the
+run detail page calls `GET /artifacts/:id/url` server side and renders the
+short-lived presigned URL that MinIO returns. That URL expires in 15 minutes.
+
+The presigned URL points at MinIO directly, so `MINIO_ENDPOINT` must be a host
+the browser can reach. In the compose stack the API talks to `minio` over the
+Docker network, which the browser cannot resolve; the page falls back to the
+streaming URL there.
+
+### Manual check
+
+```bash
+API_BASE_URL=http://localhost:4000 API_KEY=... node scripts/manual/phase-4-auth.mjs
+```
+
+It proves that an unauthenticated request gets 401, that `/health` gets 200,
+that a secret round-trips without the value ever appearing in a response, and
+that the guard rejects a definition pointed at `http://169.254.169.254/`. It
+deletes every row it creates.
+
 ## End-to-end walkthrough
 
 1. Open http://localhost:3000 → **New definition**. Give it a name, a reachable
@@ -399,7 +576,13 @@ All configuration is read from the environment (see `.env.example`):
 | `SCHEDULER_INTERVAL_MS` | Scheduler poll interval |
 | `WORKER_CONCURRENCY` | Worker job concurrency |
 | `RETENTION_DAYS` | Delete runs older than this many days. 0 disables the sweeper (default 30) |
+| `API_KEY` | The value that `X-API-Key` must match. Empty runs the API open, except in production, where the API refuses to start |
+| `SECRET_ENCRYPTION_KEY` | 32 bytes as base64 or hex. It encrypts every stored secret |
+| `ALLOW_PRIVATE_URLS` | `true` lets the platform fetch a loopback, private or link-local URL |
+| `ALLOW_CDP` | `true` lets `auth.mode=cdp` attach to a running Chrome. Local worker only |
+| `ALLOW_LOCAL_PROFILE` | `true` lets `auth.mode=chromeProfile` copy a Chrome profile. Local worker only |
 | `NEXT_PUBLIC_API_BASE_URL` | Base URL the web frontend uses to reach the `api` service (falls back to `API_BASE_URL`, then `http://localhost:4000`) |
+| `NEXT_PUBLIC_API_KEY` | The API key for browser calls. It is baked into the bundle and is therefore public |
 
 ## Web frontend (`apps/web`)
 

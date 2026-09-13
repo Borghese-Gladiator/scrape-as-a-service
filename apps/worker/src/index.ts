@@ -28,6 +28,8 @@ export async function startWorker(): Promise<void> {
         storage,
         workerId,
         launchBrowser: () => chromium.launch(),
+        allowCdp: config.allowCdp,
+        allowLocalProfile: config.allowLocalProfile,
       });
     },
     {

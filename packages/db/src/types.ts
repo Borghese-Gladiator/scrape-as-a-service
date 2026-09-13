@@ -61,6 +61,14 @@ export interface Artifact {
   created_at: Date;
 }
 
+/** A secret row without its ciphertext. This is the only shape the API returns. */
+export interface SecretMeta {
+  id: string;
+  name: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
 export interface CreateDefinitionInput {
   name: string;
   url: string;

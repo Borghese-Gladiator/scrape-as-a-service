@@ -32,10 +32,13 @@ function fakePool(captured: { config?: unknown }): Pool {
 const queue = { add: vi.fn() } as unknown as Queue<ScrapeJobData>;
 const storage = {} as never;
 
+/** Phase 4 added the SSRF guard. Replace it so this suite stays free of DNS. */
+const HERMETIC = { assertUrl: async () => {} };
+
 describe('POST /definitions config parsing', () => {
   it('accepts a v1 config and persists the upgraded v2 step program', async () => {
     const captured: { config?: unknown } = {};
-    const app = createServer(fakePool(captured), queue, storage);
+    const app = createServer(fakePool(captured), queue, storage, HERMETIC);
 
     const res = await request(app)
       .post('/definitions')
@@ -77,7 +80,7 @@ describe('POST /definitions config parsing', () => {
 
   it('accepts a v2 step program and persists it unchanged', async () => {
     const captured: { config?: unknown } = {};
-    const app = createServer(fakePool(captured), queue, storage);
+    const app = createServer(fakePool(captured), queue, storage, HERMETIC);
 
     const config = {
       version: 2,
@@ -119,10 +122,29 @@ describe('POST /definitions config parsing', () => {
     { desc: 'unknown step verb', config: { version: 2, steps: [{ op: 'evaluate', code: 'alert(1)' }] } },
     { desc: 'empty step program', config: { version: 2, steps: [] } },
   ])('rejects invalid config: $desc', async ({ config }) => {
-    const app = createServer(fakePool({}), queue, storage);
+    const app = createServer(fakePool({}), queue, storage, HERMETIC);
     const res = await request(app)
       .post('/definitions')
       .send({ name: 'n', url: 'https://x', config });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('POST /definitions URL guard', () => {
+  const config = { fields: [{ name: 'a', selector: 'b' }], artifacts: ['JSON'] };
+
+  it.each([
+    { desc: 'a link-local address', url: 'http://169.254.169.254/' },
+    { desc: 'a private address', url: 'http://10.0.0.1/' },
+    { desc: 'loopback', url: 'http://127.0.0.1:9000/' },
+    { desc: 'a file URL', url: 'file:///etc/passwd' },
+  ])('rejects $desc with 400', async ({ url }) => {
+    const captured: { config?: unknown } = {};
+    const app = createServer(fakePool(captured), queue, storage);
+
+    const res = await request(app).post('/definitions').send({ name: 'n', url, config });
+
+    expect(res.status).toBe(400);
+    expect(captured.config).toBeUndefined();
   });
 });

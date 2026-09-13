@@ -6,17 +6,27 @@ import {
   insertArtifact,
   insertAttempt,
   updateRunStatus,
+  upsertSecret,
   type Queryable,
 } from '@scraper/db';
-import { validateScrapeConfig, type ScrapeJobData, type StorageClient } from '@scraper/shared';
+import {
+  collectSecretRefs,
+  encryptSecret,
+  validateScrapeConfig,
+  type ScrapeJobData,
+  type StorageClient,
+} from '@scraper/shared';
 import { buildAndUploadArtifacts } from './artifacts.js';
 import { runScrape } from './scrape.js';
+import { loadSecrets } from './secrets.js';
 
 export interface ProcessRunDeps {
   pool: Queryable;
   storage: StorageClient;
   workerId: string;
   launchBrowser: () => Promise<Browser>;
+  allowCdp?: boolean;
+  allowLocalProfile?: boolean;
 }
 
 function errorCode(err: unknown): string {
@@ -75,8 +85,23 @@ export async function processRun(
     // A definition stored before Phase 2 still holds a v1 config; upgrade it.
     const config = validateScrapeConfig(definition.config);
 
+    // Secrets are resolved here and nowhere else: only the worker decrypts.
+    const secrets = await loadSecrets(pool, collectSecretRefs(config));
+
     browser = await launchBrowser();
-    const result = await runScrape(browser, definition.url, config);
+    const result = await runScrape(
+      browser,
+      definition.url,
+      config,
+      { secrets },
+      {
+        allowCdp: deps.allowCdp ?? false,
+        allowLocalProfile: deps.allowLocalProfile ?? false,
+        saveSecret: async (name, value) => {
+          await upsertSecret(pool, name, encryptSecret(value));
+        },
+      },
+    );
     await browser.close();
     browser = undefined;
 
