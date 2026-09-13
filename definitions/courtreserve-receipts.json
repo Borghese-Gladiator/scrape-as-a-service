@@ -1,0 +1,103 @@
+{
+  "name": "CourtReserve receipts",
+  "url": "https://app.courtreserve.com/Online/MyBalance/Index/13140?page=details",
+  "_readme": [
+    "EDIT THE TWO DATES BELOW, then run: npm run job:receipts -- --out ./exports/receipts",
+    "",
+    "EVERY SELECTOR IN THIS FILE IS AN UNVERIFIED KENDO UI 2022.1 DEFAULT.",
+    "The page is behind a login, so nobody has seen its real markup. Confirm each",
+    "one against your own session first:",
+    "",
+    "  npm run discover -- --url <the url above> --cdp http://localhost:9222",
+    "",
+    "Then replace the selectors here with the ones the report names. See",
+    "docs/RECEIPTS.md for the whole procedure.",
+    "",
+    "This file uses the openLink shape: it reads the href off the Receipt control.",
+    "Use it when the discovery report shows a real href on that control. When the",
+    "control carries no usable href, run courtreserve-receipts-newtab.json instead."
+  ],
+  "_dates": {
+    "start": "01/01/2020",
+    "end": "12/31/2026",
+    "_note": "These two values are copied into the two fill steps below. Change both places."
+  },
+  "_selectors": {
+    "paymentsTab": ".k-tabstrip .k-item > .k-link:has-text('Payments')",
+    "startDate": "#StartDate",
+    "endDate": "#EndDate",
+    "row": ".k-grid .k-grid-content tbody tr.k-master-row",
+    "next": ".k-pager-wrap a.k-pager-nav[title=\"Go to the next page\"]",
+    "receipt": "a.k-button",
+    "_note": "A copy of the live values, for reading. The steps below are what runs."
+  },
+  "config": {
+    "version": 2,
+    "auth": { "mode": "cdp", "endpointUrl": "http://localhost:9222" },
+    "limits": {
+      "maxDurationMs": 900000,
+      "maxSteps": 10000,
+      "maxPages": 500,
+      "maxArtifacts": 2000
+    },
+    "steps": [
+      { "op": "goto", "waitUntil": "load" },
+
+      {
+        "op": "click",
+        "selector": ".k-tabstrip .k-item > .k-link:has-text('Payments')",
+        "optional": true,
+        "timeoutMs": 15000
+      },
+
+      { "op": "fill", "selector": "#StartDate", "value": "01/01/2020" },
+      { "op": "fill", "selector": "#EndDate", "value": "12/31/2026" },
+      { "op": "press", "key": "Enter" },
+
+      {
+        "op": "waitFor",
+        "selector": ".k-grid .k-grid-content tbody tr.k-master-row",
+        "state": "visible",
+        "timeoutMs": 20000
+      },
+
+      {
+        "op": "paginate",
+        "nextSelector": ".k-pager-wrap a.k-pager-nav[title=\"Go to the next page\"]",
+        "maxPages": 50,
+        "steps": [
+          {
+            "op": "forEach",
+            "rowSelector": ".k-grid .k-grid-content tbody tr.k-master-row",
+            "steps": [
+              {
+                "op": "extract",
+                "name": "receipts",
+                "emit": ["JSON", "CSV"],
+                "fields": [
+                  { "name": "date", "selector": "td:nth-child(1)" },
+                  { "name": "amount", "selector": "td:nth-child(2)" },
+                  { "name": "paidDate", "selector": "td:nth-child(3)" },
+                  { "name": "paymentType", "selector": "td:nth-child(4)" }
+                ]
+              },
+              {
+                "op": "openLink",
+                "selector": "a.k-button",
+                "attribute": "href",
+                "steps": [
+                  {
+                    "op": "capture",
+                    "as": ["PNG", "PDF"],
+                    "name": "receipt-{{page}}-{{index}}-{{row.date}}",
+                    "fullPage": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

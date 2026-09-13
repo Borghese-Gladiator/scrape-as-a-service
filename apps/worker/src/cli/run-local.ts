@@ -37,6 +37,8 @@ export interface RunLocalOptions {
 export interface RunLocalDeps {
   launchBrowser: (headed: boolean) => Promise<Browser>;
   log?: (line: string) => void;
+  /** Override how `auth.mode=cdp` and `chromeProfile` open their browser. */
+  chromium?: ScrapeDeps['chromium'];
 }
 
 export interface RunLocalResult {
@@ -123,6 +125,7 @@ export async function runLocal(
   const scrapeDeps: ScrapeDeps = {
     allowCdp: options.allowCdp === true,
     allowLocalProfile: options.allowLocalProfile === true,
+    ...(deps.chromium ? { chromium: deps.chromium } : {}),
   };
   const assertUrl = (target: string) =>
     assertSafeUrl(target, { allowPrivate: options.allowPrivateUrls === true });
