@@ -91,3 +91,38 @@ Numbers were assigned before the work started: `0002_step_programs.sql`
   `MINIO_SECRET_KEY`, because `getPool` calls the full `loadConfig`. The
   migration needs only the database URL. Pre-existing. Phase 3 found it and
   correctly did not widen its scope.
+
+## Operational findings from Phase 9
+
+Two facts that change how the real job must run. Both were measured, not assumed.
+
+### CourtReserve sits behind Cloudflare, and Cloudflare blocks headless
+Measured against the live site: a headless Chromium receives
+`Attention Required! | Cloudflare`. A headed Chromium receives
+`Login | powered by CourtReserve`.
+
+Playwright launches a persistent Chrome profile headless by default, so
+`auth.mode = 'chromeProfile'` would have failed on every run, and the failure
+would have looked like a missing selector rather than a block.
+`apps/worker/src/cli/chrome-profile.ts` forces a visible window.
+`auth.mode = 'cdp'` needs no wrapper, because it attaches to a browser the user
+already runs. **Prefer `cdp`.**
+
+### `page.pdf()` is not headless-only
+`docs/IMPLEMENTATION_PROMPT.md` section 4.1 states that `page.pdf()` works in
+Chromium headless only. That is out of date for the Playwright version this
+repository pins. PDF capture works headed as well, so PNG and PDF capture are
+both safe on the headed path that Cloudflare forces.
+
+## Local containers left running
+
+Three ad-hoc containers back the manual scripts. They are not part of
+`docker-compose.yml`. Remove them with:
+
+```
+docker rm -f scraper-phase3-pg scraper-manual-redis scraper-manual-minio
+```
+
+Postgres is on 55433, Redis on 56380, MinIO on 59002. The `scraper-itest-*`
+containers belong to `docker-compose.test.yml`; remove those with
+`npm run test:integration:down`.
