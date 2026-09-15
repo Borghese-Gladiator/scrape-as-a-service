@@ -102,6 +102,9 @@ export class FakePage {
 
   constructor(readonly context: FakeContext) {}
 
+  /** No fixture ever emits a `console` message, so this just satisfies the type. */
+  on(_event: string, _handler: (...args: unknown[]) => void): void {}
+
   url(): string {
     return this.currentUrl;
   }
@@ -176,6 +179,7 @@ export class FakeContext {
   private readonly routes: Map<string, Route>;
   private readonly pageWaiters: Array<(page: FakePage) => void> = [];
   private readonly queuedPages: FakePage[] = [];
+  private readonly pageListeners: Array<(page: FakePage) => void> = [];
 
   constructor(routes: Record<string, Route> = {}) {
     this.routes = new Map(Object.entries(routes));
@@ -186,9 +190,19 @@ export class FakeContext {
     return make ? make() : {};
   }
 
+  /** Mirrors `BrowserContext.on('page', ...)`, the only event runScrape listens for. */
+  on(event: string, handler: (page: FakePage) => void): void {
+    if (event === 'page') this.pageListeners.push(handler);
+  }
+
+  private emitPage(page: FakePage): void {
+    for (const handler of this.pageListeners) handler(page);
+  }
+
   async newPage(): Promise<FakePage> {
     const page = new FakePage(this);
     this.allPages.push(page);
+    this.emitPage(page);
     return page;
   }
 
@@ -200,6 +214,7 @@ export class FakeContext {
   openPage(url: string): FakePage {
     const page = new FakePage(this);
     this.allPages.push(page);
+    this.emitPage(page);
     page.navigate(url);
     const waiter = this.pageWaiters.shift();
     if (waiter) waiter(page);

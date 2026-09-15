@@ -238,6 +238,49 @@ node scripts/manual/phase-2-interpreter.mjs
 
 Run `npx playwright install chromium` first when Chromium is missing.
 
+## Delivery: get the files out
+
+### The local runner — no stack at all
+
+```bash
+npm run run-local -- --definition ./my-definition.json --out ./receipts
+```
+
+The local runner reads a definition from disk, launches a browser, runs the step
+program, and writes every artifact into the folder. It needs no Postgres, no
+Redis, and no MinIO. This is the mode to use when the target site is only
+reachable from your own machine, which a Docker worker cannot do.
+
+| Flag | Purpose |
+| --- | --- |
+| `--definition` | The JSON file. Either `{ name?, url, config }` or a bare config. |
+| `--out` | The output folder. The runner creates it when it is missing. |
+| `--url` | Override the URL that the definition carries. |
+| `--headed` | Show the browser. The default is headless. |
+| `--timeout` | Override `limits.maxDurationMs`, in milliseconds. |
+
+The runner prints one line per artifact and a count. It exits 1 on a failure and
+prints the error code first, for example `error BAD_CONFIG: steps must be a
+non-empty array`.
+
+### Bulk export from a run
+
+```bash
+# every artifact of one run, as a streaming archive
+curl -OJ http://localhost:4000/runs/<run-id>/artifacts.zip
+
+# the same thing, unpacked into a folder
+npm run export -- --run <run-id> --out ./receipts
+```
+
+`GET /runs/:id/artifacts.zip` opens one object at a time and writes it straight
+to the response, so a run of hundreds of screenshots never sits in memory. Each
+entry takes the artifact `name` that the step program produced. The run detail
+page carries a **Download all as ZIP** link for the same route.
+
+The export CLI reads `--api`, then `API_BASE_URL`, then
+`http://localhost:4000`.
+
 ### The v1 config
 
 A definition that carries no `version` is a v1 config. `POST /definitions`
@@ -430,6 +473,54 @@ that a secret round-trips without the value ever appearing in a response, and
 that the guard rejects a definition pointed at `http://169.254.169.254/`. It
 deletes every row it creates.
 
+## The API
+
+| Route | Purpose |
+| --- | --- |
+| `GET /definitions` | One page of definitions. A soft-deleted one never appears. |
+| `GET /definitions/:id` | One definition. A soft-deleted one still answers. |
+| `POST /definitions` | Create. It accepts a v1 or a v2 config and stores v2. |
+| `PUT /definitions/:id` | Update `name`, `url`, or `config`. Each is optional. |
+| `DELETE /definitions/:id` | Soft delete. The runs and artifacts stay readable. |
+| `GET /schedules` · `POST /schedules` · `PATCH /schedules/:id` | List, create, enable. |
+| `DELETE /schedules/:id` | Remove a schedule. |
+| `GET /runs` | One page of runs. It takes `?definitionId=` and `?status=`. |
+| `GET /runs/:id` | The run, its attempts, and its artifacts. |
+| `POST /runs` | Trigger a run. |
+| `POST /runs/:id/cancel` | Cancel a QUEUED or RUNNING run. |
+| `POST /runs/:id/rerun` | Start a new run from the same definition. |
+| `GET /runs/:id/artifacts` | The artifact rows of a run. |
+| `GET /runs/:id/artifacts.zip` | Every artifact of a run, as a streaming archive. |
+| `GET /artifacts/:id/download` | One artifact. |
+
+### Pagination
+
+`GET /runs` and `GET /definitions` return a page, not a bare array:
+
+```json
+{ "items": [ ... ], "nextCursor": "MjAyNi0wMS0wMV..." }
+```
+
+Pass `?limit=` (default 50, maximum 200) and `?cursor=`. The order is
+`created_at DESC, id DESC`, so a row that arrives during a walk never makes an
+earlier row repeat. `nextCursor` is `null` on the last page. An unreadable
+cursor starts again at page one.
+
+### Cancel
+
+A cancel marks the run `FAILED` and writes the error code `CANCELLED` on an
+attempt. The run status enum keeps its four values, because the error code
+already carries the reason. A QUEUED run also loses its BullMQ job. A RUNNING
+run keeps its worker process: the job is already locked, so the worker stops at
+its next write.
+
+### Retention
+
+The scheduler deletes runs older than `RETENTION_DAYS` (default 30) once an
+hour. It removes the storage objects first and the rows second, so a failure
+between the two leaves a row for the next sweep instead of an orphan object in
+MinIO. Set `RETENTION_DAYS=0` to keep everything.
+
 ## End-to-end walkthrough
 
 1. Open http://localhost:3000 → **New definition**. Give it a name, a reachable
@@ -453,6 +544,17 @@ deletes every row it creates.
 6. **Stale run:** start a run, then `docker compose kill worker`. The attempt
    stops its heartbeat. Within `STALE_ATTEMPT_MINUTES` the scheduler marks the
    attempt and the run `FAILED` with the error code `STALE`.
+7. **Export:** on a `SUCCEEDED` run, click **Download all as ZIP**, or run
+   `npm run export -- --run <run-id> --out ./receipts`.
+
+To prove the delivery path against a fixture site, run the manual script. Part
+one needs only Chromium. Part two needs Postgres and MinIO, and it deletes every
+row and object that it creates:
+
+```bash
+npm run build
+node scripts/manual/phase-5-export.mjs
+```
 
 ## Run reliability
 
@@ -486,22 +588,6 @@ node scripts/manual/phase-3-scheduler.mjs "$DATABASE_URL"
 ```
 
 Both scripts remove every row that they write.
-
-## API
-
-| Route | Purpose |
-| --- | --- |
-| `GET /health` | Liveness probe |
-| `GET /definitions` | List every definition |
-| `POST /definitions` | Create a definition (`name`, `url`, `config`) |
-| `GET /schedules` | List schedules, optionally `?definitionId=` |
-| `POST /schedules` | Create a schedule (`definitionId`, `cron`, `timezone`, `enabled`) |
-| `PATCH /schedules/:id` | Enable or disable a schedule (`enabled`) |
-| `GET /runs` | List runs, optionally `?definitionId=` |
-| `GET /runs/:id` | Read one run with its attempts and artifacts |
-| `POST /runs` | Trigger a run |
-| `GET /runs/:runId/artifacts` | List the artifacts of a run |
-| `GET /artifacts/:id/download` | Download one artifact |
 
 ### `POST /runs`
 
@@ -597,6 +683,7 @@ All configuration is read from the environment (see `.env.example`):
 | `ALLOW_PRIVATE_URLS` | `true` lets the platform fetch a loopback, private or link-local URL |
 | `ALLOW_CDP` | `true` lets `auth.mode=cdp` attach to a running Chrome. Local worker only |
 | `ALLOW_LOCAL_PROFILE` | `true` lets `auth.mode=chromeProfile` copy a Chrome profile. Local worker only |
+| `RETENTION_DAYS` | Delete runs older than this many days. 0 disables the sweeper (default 30) |
 | `NEXT_PUBLIC_API_BASE_URL` | Base URL the web frontend uses to reach the `api` service (falls back to `API_BASE_URL`, then `http://localhost:4000`) |
 | `NEXT_PUBLIC_API_KEY` | The API key for browser calls. It is baked into the bundle and is therefore public |
 

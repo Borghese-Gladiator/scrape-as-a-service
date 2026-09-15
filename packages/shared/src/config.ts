@@ -23,6 +23,8 @@ export interface AppConfig {
   allowCdp: boolean;
   allowLocalProfile: boolean;
   allowPrivateUrls: boolean;
+  /** Delete runs older than this many days. 0 disables the retention sweeper. */
+  retentionDays: number;
 }
 
 function required(env: NodeJS.ProcessEnv, key: string): string {
@@ -92,5 +94,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     allowCdp: toBool(optional(env, 'ALLOW_CDP', 'false')),
     allowLocalProfile: toBool(optional(env, 'ALLOW_LOCAL_PROFILE', 'false')),
     allowPrivateUrls: toBool(optional(env, 'ALLOW_PRIVATE_URLS', 'false')),
+    retentionDays: toInt(optional(env, 'RETENTION_DAYS', '30'), 'RETENTION_DAYS'),
   };
 }

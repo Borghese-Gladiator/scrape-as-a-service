@@ -15,9 +15,11 @@ export const POLL_INTERVAL_MS = 2000;
 export function RunDetailLive({
   initialRun,
   artifactDownloadUrl,
+  archiveUrl,
 }: {
   initialRun: RunDetailType;
   artifactDownloadUrl?: (artifactId: string) => string;
+  archiveUrl?: string;
 }) {
   const api = useMemo(() => getApiClient(), []);
   const [run, setRun] = useState(initialRun);
@@ -55,6 +57,7 @@ export function RunDetailLive({
       <RunDetail
         run={run}
         artifactDownloadUrl={artifactDownloadUrl ?? ((id) => api.artifactDownloadUrl(id))}
+        archiveUrl={archiveUrl}
       />
     </div>
   );

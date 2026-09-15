@@ -11,6 +11,7 @@ export interface StorageClient {
   ensureBucket(): Promise<void>;
   put(objectKey: string, body: Buffer, contentType: string): Promise<StoragePutResult>;
   getStream(objectKey: string): Promise<NodeJS.ReadableStream>;
+  remove(objectKey: string): Promise<void>;
   presignedGetUrl(objectKey: string, expirySeconds?: number): Promise<string>;
 }
 
@@ -50,6 +51,10 @@ class MinioStorageClient implements StorageClient {
 
   async getStream(objectKey: string): Promise<NodeJS.ReadableStream> {
     return this.client.getObject(this.bucket, objectKey);
+  }
+
+  async remove(objectKey: string): Promise<void> {
+    await this.client.removeObject(this.bucket, objectKey);
   }
 
   async presignedGetUrl(objectKey: string, expirySeconds = 3600): Promise<string> {

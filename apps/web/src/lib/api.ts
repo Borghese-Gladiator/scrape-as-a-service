@@ -3,6 +3,7 @@ import type {
   Artifact,
   CreateDefinitionInput,
   CreateScheduleInput,
+  Page,
   RunDetail,
   ScrapeDefinition,
   ScrapeRun,
@@ -83,14 +84,12 @@ export function getApiClient(baseUrl?: string): ApiClient {
   const publicBase = resolvePublicBaseUrl(baseUrl);
 
   return {
-    listDefinitions() {
-      return request<ScrapeDefinition[]>(`${base}/definitions`);
+    async listDefinitions() {
+      const page = await request<Page<ScrapeDefinition>>(`${base}/definitions`);
+      return page.items;
     },
-    async getDefinition(id: string) {
-      const all = await request<ScrapeDefinition[]>(`${base}/definitions`);
-      const found = all.find((d) => d.id === id);
-      if (!found) throw new Error('definition not found');
-      return found;
+    getDefinition(id: string) {
+      return request<ScrapeDefinition>(`${base}/definitions/${encodeURIComponent(id)}`);
     },
     createDefinition(input: CreateDefinitionInput) {
       return request<ScrapeDefinition>(`${base}/definitions`, {
@@ -120,9 +119,10 @@ export function getApiClient(baseUrl?: string): ApiClient {
         body: JSON.stringify({ definitionId }),
       });
     },
-    listRuns(definitionId?: string) {
+    async listRuns(definitionId?: string) {
       const query = definitionId ? `?definitionId=${encodeURIComponent(definitionId)}` : '';
-      return request<ScrapeRun[]>(`${base}/runs${query}`);
+      const page = await request<Page<ScrapeRun>>(`${base}/runs${query}`);
+      return page.items;
     },
     getRun(id: string) {
       return request<RunDetail>(`${base}/runs/${encodeURIComponent(id)}`);
@@ -138,6 +138,9 @@ export function getApiClient(baseUrl?: string): ApiClient {
         `${base}/artifacts/${encodeURIComponent(artifactId)}/url`,
       );
       return body.url;
+    },
+    runArchiveUrl(runId: string) {
+      return `${publicBase}/runs/${encodeURIComponent(runId)}/artifacts.zip`;
     },
   };
 }

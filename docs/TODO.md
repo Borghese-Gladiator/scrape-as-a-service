@@ -96,6 +96,11 @@ Related: there is no `PDF` artifact type. For receipts a PDF is often the better
 output than a PNG.
 
 ### 1.7 No local folder output — P0
+
+**DONE (phase 5)** — Three answers. `npm run run-local` runs a definition with
+no stack at all and writes every artifact straight into a folder.
+`GET /runs/:id/artifacts.zip` streams the whole run as one archive.
+`npm run export -- --run <id> --out ./folder` unpacks that archive to disk.
 Artifacts go to MinIO and come back one at a time through
 `GET /artifacts/:id/download`. There is no bulk export, no ZIP of a run, and no
 "write to this host directory" mode. Retrieving 50 receipts means 50 clicks.
@@ -278,27 +283,50 @@ UUID. `presignedGetUrl` exists on the storage client but is never used.
 ## 4. API and data model
 
 ### 4.1 No update or delete — P1
+
+**DONE (phase 5)** — `PUT /definitions/:id`, `DELETE /definitions/:id` as a soft
+delete through a new `deleted_at` column, and `DELETE /schedules/:id`. A
+soft-deleted definition leaves the list, still answers `GET /definitions/:id`,
+starts no new run, and makes its schedules stop firing.
 Definitions and schedules can only be created and listed. There is no
 `PUT /definitions/:id`, no `DELETE`, and no way to disable a definition. A typo
 in a selector means creating a second definition and living with the first
 forever.
 
 ### 4.2 No `GET /definitions/:id` — P2
+
+**DONE (phase 5)** — The route exists, and `apps/web/src/lib/api.ts` calls it
+instead of listing every definition.
 The web client works around this by listing every definition and filtering in
 memory (`apps/web/src/lib/api.ts:69`). This is O(all definitions) on every
 definition page load.
 
 ### 4.3 No pagination, filtering, or limits — P1
+
+**DONE (phase 5)** — `GET /runs` and `GET /definitions` take `?limit=` and
+`?cursor=`, order by `created_at DESC, id DESC`, and return
+`{ items, nextCursor }`. The limit defaults to 50 and clamps to 200.
+`GET /runs` also takes `?status=`. A date filter stays open.
 `listRuns` and `listDefinitions` return every row, ordered by `created_at DESC`,
 with no `LIMIT`. Run history grows without bound; a busy definition will make
 `GET /runs` return tens of thousands of rows. There is also no filter by status
 or by date.
 
 ### 4.4 No run cancellation and no re-run — P2
+
+**DONE (phase 5)** — `POST /runs/:id/cancel` removes the BullMQ job, marks the
+run FAILED, and records the error code `CANCELLED` on an attempt.
+`POST /runs/:id/rerun` creates a new run from the same definition. A cancel of a
+RUNNING run does not interrupt the worker process; Phase 3 owns that.
 A queued or running job cannot be stopped. A past run cannot be repeated without
 going through the definition again.
 
 ### 4.5 No retention or cleanup — P1
+
+**DONE (phase 5)** — `apps/scheduler/src/retention.ts` deletes runs older than
+`RETENTION_DAYS` every hour. It removes the storage objects first and the rows
+second, so a crash between the two leaves no orphan in MinIO. `RETENTION_DAYS=0`
+disables the sweeper.
 Nothing ever deletes artifacts from MinIO or rows from Postgres. Storage grows
 monotonically. There is no TTL on artifacts and no archive policy.
 

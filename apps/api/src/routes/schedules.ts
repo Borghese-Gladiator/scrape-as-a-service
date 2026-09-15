@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import {
   CATCH_UP_POLICIES,
   createSchedule,
+  deleteSchedule,
   getDefinition,
   isCatchUpPolicy,
   listSchedules,
@@ -81,6 +82,17 @@ export function schedulesRouter(pool: Pool): Router {
         throw new HttpError(404, 'schedule not found');
       }
       res.json(schedule);
+    }),
+  );
+
+  router.delete(
+    '/:id',
+    asyncHandler(async (req, res) => {
+      const removed = await deleteSchedule(pool, req.params.id ?? '');
+      if (!removed) {
+        throw new HttpError(404, 'schedule not found');
+      }
+      res.status(204).end();
     }),
   );
 

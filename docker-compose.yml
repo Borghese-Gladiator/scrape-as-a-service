@@ -151,6 +151,7 @@ services:
       STALE_ATTEMPT_MINUTES: ${STALE_ATTEMPT_MINUTES:-10}
       SCHEDULER_HEALTH_PORT: "4002"
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      RETENTION_DAYS: ${RETENTION_DAYS:-30}
     ports:
       - "${SCHEDULER_HEALTH_PORT:-4002}:4002"
     depends_on:

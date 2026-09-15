@@ -1,5 +1,6 @@
 export * from './client.js';
 export * from './types.js';
+export * from './pagination.js';
 export * from './migrate.js';
 export * from './repositories/definitions.js';
 export * from './repositories/schedules.js';

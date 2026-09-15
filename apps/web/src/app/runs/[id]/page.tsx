@@ -41,6 +41,7 @@ export default async function RunDetailPage({ params }: { params: { id: string }
         artifactDownloadUrl={(artifactId) =>
           links.get(artifactId) ?? api.artifactDownloadUrl(artifactId)
         }
+        archiveUrl={api.runArchiveUrl(run.id)}
       />
     </div>
   );

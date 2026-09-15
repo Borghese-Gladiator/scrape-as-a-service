@@ -81,6 +81,25 @@ export async function findStaleAttempts(
   return rows;
 }
 
+/** Fail every attempt of a run that is still RUNNING. A cancel uses it. */
+export async function failRunningAttempts(
+  db: Queryable,
+  runId: string,
+  error: { code: string; message: string },
+): Promise<ScrapeRunAttempt[]> {
+  const { rows } = await db.query<ScrapeRunAttempt>(
+    `UPDATE scrape_run_attempts
+     SET status = 'FAILED',
+         error_code = $2,
+         error_message = $3,
+         finished_at = now()
+     WHERE run_id = $1 AND status = 'RUNNING'
+     RETURNING ${COLUMNS}`,
+    [runId, error.code, error.message],
+  );
+  return rows;
+}
+
 export async function listAttempts(
   db: Queryable,
   runId: string,
