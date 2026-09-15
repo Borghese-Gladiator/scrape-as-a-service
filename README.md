@@ -258,6 +258,9 @@ reachable from your own machine, which a Docker worker cannot do.
 | `--url` | Override the URL that the definition carries. |
 | `--headed` | Show the browser. The default is headless. |
 | `--timeout` | Override `limits.maxDurationMs`, in milliseconds. |
+| `--allow-private` | Let the run reach a loopback or a private URL. A local fixture site needs it. |
+| `--allow-cdp` | Let `auth.mode=cdp` attach to a Chrome that already runs. |
+| `--allow-profile` | Let `auth.mode=chromeProfile` copy a Chrome profile. |
 
 The runner prints one line per artifact and a count. It exits 1 on a failure and
 prints the error code first, for example `error BAD_CONFIG: steps must be a
@@ -280,6 +283,64 @@ page carries a **Download all as ZIP** link for the same route.
 
 The export CLI reads `--api`, then `API_BASE_URL`, then
 `http://localhost:4000`.
+
+## The CourtReserve receipts job
+
+The job that the whole platform exists to serve: retrieve your own payment
+receipts from CourtReserve, as a PNG and a PDF for each one.
+
+```bash
+# 1. Find out what the page really looks like, in your own logged-in session.
+npm run discover -- --url "<the balance page>" --cdp http://localhost:9222
+
+# 2. Put the selectors it names into definitions/courtreserve-receipts.json.
+
+# 3. Run the job.
+npm run job:receipts -- --out ./exports/receipts
+```
+
+**Read [docs/RECEIPTS.md](RECEIPTS.md) before the first run.** It gives the
+exact steps, including how to start Chrome so that `--cdp` works. Two points
+matter most:
+
+- Every selector in the shipped definition is an **unverified Kendo UI 2022.1
+  default**. The page is behind a login, so nobody has seen its markup. The
+  discovery CLI confirms each one against your session.
+- Quit Chrome **completely** before you start it with
+  `--remote-debugging-port=9222`. A flag passed while Chrome already runs opens
+  a window in the existing process and does not open the port. `--profile` is
+  the alternative that needs no restart.
+
+Two definition files ship, because the Receipt control may be an anchor or a
+JavaScript handler. The discovery report names which to use.
+
+| File | Receipt step |
+| --- | --- |
+| `definitions/courtreserve-receipts.json` | `openLink` on the control's `href`. The default. |
+| `definitions/courtreserve-receipts-newtab.json` | `click` with `opens: newTab`, then `capture`, then `goBack`. |
+
+To prove the plumbing without the live site, run the manual script. It serves a
+fixture with the same Kendo markup, runs the shipped definition against it, and
+checks every file it produces. It needs only Chromium:
+
+```bash
+node scripts/manual/phase-9-courtreserve-fixture.mjs
+```
+
+### The discovery CLI
+
+```bash
+npm run discover -- --url <url> [--cdp http://localhost:9222] [--profile] [--out report.json]
+```
+
+It opens a page in a browser session that you already logged into and reports
+the selectors a definition needs: every grid with its headers and row count,
+every control in the first data row with its `href` and `target`, every pager
+control with its disabled state, every tab strip, and every date input. It ends
+with a suggested `rowSelector`, `nextSelector` and receipt-control selector,
+each with the evidence behind it. It prints the report and writes it as JSON.
+
+It changes nothing on the page.
 
 ### The v1 config
 
@@ -554,6 +615,13 @@ row and object that it creates:
 ```bash
 npm run build
 node scripts/manual/phase-5-export.mjs
+```
+
+To prove the CourtReserve job against a Kendo-shaped fixture, with no stack and
+no live session:
+
+```bash
+node scripts/manual/phase-9-courtreserve-fixture.mjs
 ```
 
 ## Run reliability

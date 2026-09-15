@@ -12,7 +12,9 @@
     "test": "vitest run && npm run test --workspace @scraper/web",
     "migrate": "npm run migrate --workspace @scraper/db",
     "run-local": "tsc -b apps/worker && node apps/worker/dist/cli/run-local.js",
-    "export": "tsc -b apps/worker && node apps/worker/dist/cli/export.js"
+    "export": "tsc -b apps/worker && node apps/worker/dist/cli/export.js",
+    "discover": "tsc -b apps/worker && node apps/worker/dist/cli/discover.js",
+    "job:receipts": "tsc -b apps/worker && node scripts/job-receipts.mjs"
   },
   "engines": {
     "node": ">=20"

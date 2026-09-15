@@ -139,7 +139,7 @@ describe('runLocal', () => {
     const lines: string[] = [];
 
     const result = await runLocal(
-      { definitionPath, outDir },
+      { definitionPath, outDir, allowPrivateUrls: true },
       { launchBrowser: async () => fakeBrowser(fixtureSite()), log: (line) => lines.push(line) },
     );
 
@@ -167,7 +167,7 @@ describe('runLocal', () => {
     const outDir = join(workDir, 'out');
 
     const result = await runLocal(
-      { definitionPath, outDir, url: LIST_URL },
+      { definitionPath, outDir, url: LIST_URL, allowPrivateUrls: true },
       { launchBrowser: async () => fakeBrowser(fixtureSite()), log: () => {} },
     );
 
@@ -187,7 +187,7 @@ describe('runLocal', () => {
     const outDir = join(workDir, 'out');
 
     await runLocal(
-      { definitionPath, outDir },
+      { definitionPath, outDir, allowPrivateUrls: true },
       { launchBrowser: async () => fakeBrowser(fixtureSite()), log: () => {} },
     );
 
@@ -200,10 +200,10 @@ describe('run-local main', () => {
     const definitionPath = await writeDefinition({ url: LIST_URL, config: CONFIG });
     const outDir = join(workDir, 'out');
 
-    const code = await main(['--definition', definitionPath, '--out', outDir], {
-      launchBrowser: async () => fakeBrowser(fixtureSite()),
-      log: () => {},
-    });
+    const code = await main(
+      ['--definition', definitionPath, '--out', outDir, '--allow-private'],
+      { launchBrowser: async () => fakeBrowser(fixtureSite()), log: () => {} },
+    );
 
     expect(code).toBe(0);
     expect(await readdir(outDir)).toHaveLength(7);

@@ -12,3 +12,7 @@ playwright-report/
 test-results/
 .DS_Store
 *.log
+
+# Phase 9: the receipts job and the discovery report write here.
+exports/
+discovery-report.json
