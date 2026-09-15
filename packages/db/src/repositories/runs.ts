@@ -1,5 +1,13 @@
 import type { Queryable } from '../client.js';
-import type { RunDetail, RunStatus, RunTrigger, ScrapeRun } from '../types.js';
+import { decodeCursor, resolveLimit, toPage } from '../pagination.js';
+import type {
+  Page,
+  PageQuery,
+  RunDetail,
+  RunStatus,
+  RunTrigger,
+  ScrapeRun,
+} from '../types.js';
 import { listAttempts } from './attempts.js';
 import { listArtifacts } from './artifacts.js';
 
@@ -51,10 +59,7 @@ export async function getRun(db: Queryable, id: string): Promise<ScrapeRun | nul
   return rows[0] ?? null;
 }
 
-export async function getRunDetail(
-  db: Queryable,
-  id: string,
-): Promise<RunDetail | null> {
+export async function getRunDetail(db: Queryable, id: string): Promise<RunDetail | null> {
   const run = await getRun(db, id);
   if (!run) return null;
   const [attempts, artifacts] = await Promise.all([
@@ -64,20 +69,63 @@ export async function getRunDetail(
   return { ...run, attempts, artifacts };
 }
 
+export interface ListRunsQuery extends PageQuery {
+  definitionId?: string;
+  status?: RunStatus;
+}
+
+/** One keyset page of runs, newest first, with an optional status filter. */
 export async function listRuns(
   db: Queryable,
-  definitionId?: string,
-): Promise<ScrapeRun[]> {
-  if (definitionId) {
-    const { rows } = await db.query<ScrapeRun>(
-      `SELECT ${COLUMNS} FROM scrape_runs
-       WHERE definition_id = $1 ORDER BY created_at DESC`,
-      [definitionId],
-    );
-    return rows;
+  query: ListRunsQuery = {},
+): Promise<Page<ScrapeRun>> {
+  const limit = resolveLimit(query.limit);
+  const cursor = decodeCursor(query.cursor);
+  const values: unknown[] = [];
+  const where: string[] = [];
+
+  if (query.definitionId !== undefined) {
+    values.push(query.definitionId);
+    where.push(`definition_id = $${values.length}`);
   }
+  if (query.status !== undefined) {
+    values.push(query.status);
+    where.push(`status = $${values.length}::run_status`);
+  }
+  if (cursor) {
+    values.push(cursor.createdAt, cursor.id);
+    where.push(`(created_at, id) < ($${values.length - 1}, $${values.length})`);
+  }
+  values.push(limit + 1);
+
   const { rows } = await db.query<ScrapeRun>(
-    `SELECT ${COLUMNS} FROM scrape_runs ORDER BY created_at DESC`,
+    `SELECT ${COLUMNS} FROM scrape_runs
+     ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
+     ORDER BY created_at DESC, id DESC
+     LIMIT $${values.length}`,
+    values,
+  );
+  return toPage(rows, limit);
+}
+
+/** Oldest first, so the retention sweeper always makes progress. */
+export async function findRunsOlderThan(
+  db: Queryable,
+  before: Date,
+  limit: number,
+): Promise<ScrapeRun[]> {
+  const { rows } = await db.query<ScrapeRun>(
+    `SELECT ${COLUMNS} FROM scrape_runs
+     WHERE created_at < $1
+     ORDER BY created_at ASC
+     LIMIT $2`,
+    [before, limit],
   );
   return rows;
+}
+
+/** The artifact rows of the run go with it through ON DELETE CASCADE. */
+export async function deleteRun(db: Queryable, id: string): Promise<boolean> {
+  const { rowCount } = await db.query(`DELETE FROM scrape_runs WHERE id = $1`, [id]);
+  return (rowCount ?? 0) > 0;
 }

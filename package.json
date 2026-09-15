@@ -9,15 +9,32 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "typecheck": "tsc -b packages/db packages/shared apps/api apps/worker apps/scheduler",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest run && npm run test --workspace @scraper/web",
-    "migrate": "npm run migrate --workspace @scraper/db"
+    "test:integration": "npm run typecheck && vitest run --config vitest.integration.config.ts",
+    "test:integration:up": "docker compose -f docker-compose.test.yml up -d --wait",
+    "test:integration:down": "docker compose -f docker-compose.test.yml down -v",
+    "postinstall:browsers": "npx playwright install chromium",
+    "migrate": "npm run migrate --workspace @scraper/db",
+    "run-local": "tsc -b apps/worker && node apps/worker/dist/cli/run-local.js",
+    "export": "tsc -b apps/worker && node apps/worker/dist/cli/export.js",
+    "discover": "tsc -b apps/worker && node apps/worker/dist/cli/discover.js",
+    "job:receipts": "tsc -b apps/worker && node scripts/job-receipts.mjs"
   },
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/node": "^22.10.2",
+    "eslint": "^9.17.0",
+    "globals": "^15.15.0",
+    "prettier": "^3.4.2",
     "typescript": "^5.7.2",
+    "typescript-eslint": "^8.19.0",
     "vitest": "^2.1.8"
   }
 }

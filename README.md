@@ -20,6 +20,8 @@ apps/
 
 - Docker + Docker Compose v2 (the only requirement to run the full stack)
 - Node >= 20 (only for local, non-Docker development / running tests)
+- Chromium for Playwright, for a local worker and for the end-to-end test:
+  `npx playwright install chromium`. The Docker images already carry it.
 
 ## Run the whole stack (Docker Compose)
 
@@ -119,7 +121,7 @@ definition.
 ```ts
 interface ScrapeConfig {
   version: 2;
-  auth?: AuthConfig;   // Phase 4 executes this; the validator accepts it today
+  auth?: AuthConfig;   // see Security below
   steps: Step[];
   limits?: Limits;
   record?: boolean;    // record the context as one recording.webm artifact
@@ -238,6 +240,110 @@ node scripts/manual/phase-2-interpreter.mjs
 
 Run `npx playwright install chromium` first when Chromium is missing.
 
+## Delivery: get the files out
+
+### The local runner — no stack at all
+
+```bash
+npm run run-local -- --definition ./my-definition.json --out ./receipts
+```
+
+The local runner reads a definition from disk, launches a browser, runs the step
+program, and writes every artifact into the folder. It needs no Postgres, no
+Redis, and no MinIO. This is the mode to use when the target site is only
+reachable from your own machine, which a Docker worker cannot do.
+
+| Flag | Purpose |
+| --- | --- |
+| `--definition` | The JSON file. Either `{ name?, url, config }` or a bare config. |
+| `--out` | The output folder. The runner creates it when it is missing. |
+| `--url` | Override the URL that the definition carries. |
+| `--headed` | Show the browser. The default is headless. |
+| `--timeout` | Override `limits.maxDurationMs`, in milliseconds. |
+| `--allow-private` | Let the run reach a loopback or a private URL. A local fixture site needs it. |
+| `--allow-cdp` | Let `auth.mode=cdp` attach to a Chrome that already runs. |
+| `--allow-profile` | Let `auth.mode=chromeProfile` copy a Chrome profile. |
+
+The runner prints one line per artifact and a count. It exits 1 on a failure and
+prints the error code first, for example `error BAD_CONFIG: steps must be a
+non-empty array`.
+
+### Bulk export from a run
+
+```bash
+# every artifact of one run, as a streaming archive
+curl -OJ http://localhost:4000/runs/<run-id>/artifacts.zip
+
+# the same thing, unpacked into a folder
+npm run export -- --run <run-id> --out ./receipts
+```
+
+`GET /runs/:id/artifacts.zip` opens one object at a time and writes it straight
+to the response, so a run of hundreds of screenshots never sits in memory. Each
+entry takes the artifact `name` that the step program produced. The run detail
+page carries a **Download all as ZIP** link for the same route.
+
+The export CLI reads `--api`, then `API_BASE_URL`, then
+`http://localhost:4000`.
+
+## The CourtReserve receipts job
+
+The job that the whole platform exists to serve: retrieve your own payment
+receipts from CourtReserve, as a PNG and a PDF for each one.
+
+```bash
+# 1. Find out what the page really looks like, in your own logged-in session.
+npm run discover -- --url "<the balance page>" --cdp http://localhost:9222
+
+# 2. Put the selectors it names into definitions/courtreserve-receipts.json.
+
+# 3. Run the job.
+npm run job:receipts -- --out ./exports/receipts
+```
+
+**Read [docs/RECEIPTS.md](RECEIPTS.md) before the first run.** It gives the
+exact steps, including how to start Chrome so that `--cdp` works. Two points
+matter most:
+
+- Every selector in the shipped definition is an **unverified Kendo UI 2022.1
+  default**. The page is behind a login, so nobody has seen its markup. The
+  discovery CLI confirms each one against your session.
+- Quit Chrome **completely** before you start it with
+  `--remote-debugging-port=9222`. A flag passed while Chrome already runs opens
+  a window in the existing process and does not open the port. `--profile` is
+  the alternative that needs no restart.
+
+Two definition files ship, because the Receipt control may be an anchor or a
+JavaScript handler. The discovery report names which to use.
+
+| File | Receipt step |
+| --- | --- |
+| `definitions/courtreserve-receipts.json` | `openLink` on the control's `href`. The default. |
+| `definitions/courtreserve-receipts-newtab.json` | `click` with `opens: newTab`, then `capture`, then `goBack`. |
+
+To prove the plumbing without the live site, run the manual script. It serves a
+fixture with the same Kendo markup, runs the shipped definition against it, and
+checks every file it produces. It needs only Chromium:
+
+```bash
+node scripts/manual/phase-9-courtreserve-fixture.mjs
+```
+
+### The discovery CLI
+
+```bash
+npm run discover -- --url <url> [--cdp http://localhost:9222] [--profile] [--out report.json]
+```
+
+It opens a page in a browser session that you already logged into and reports
+the selectors a definition needs: every grid with its headers and row count,
+every control in the first data row with its `href` and `target`, every pager
+control with its disabled state, every tab strip, and every date input. It ends
+with a suggested `rowSelector`, `nextSelector` and receipt-control selector,
+each with the evidence behind it. It prints the report and writes it as JSON.
+
+It changes nothing on the page.
+
 ### The v1 config
 
 A definition that carries no `version` is a v1 config. `POST /definitions`
@@ -252,6 +358,231 @@ v1 { waitFor, rowSelector, fields, artifacts }
 they become `extract.emit`. `PNG` and `HTML` become a capture. `WEBM` becomes
 `record: true`. An upgraded config keeps the v1 filenames: `data.json`,
 `data.csv`, `screenshot.png`, `source.html`, and `recording.webm`.
+
+## Security
+
+### The API key
+
+Every route except `/health` needs the `X-API-Key` header. The value comes from
+`API_KEY`.
+
+```bash
+curl -H "X-API-Key: $API_KEY" http://localhost:4000/definitions
+curl http://localhost:4000/health          # no key needed
+```
+
+When `API_KEY` is empty the API runs open and prints a warning on boot. With
+`NODE_ENV=production` an empty `API_KEY` stops the API from starting. The
+comparison is timing safe.
+
+**How the browser gets a key.** A server-rendered page reads the server-only
+`API_KEY`, which never reaches the bundle. A client component runs in the
+browser and cannot read it, so it falls back to `NEXT_PUBLIC_API_KEY`. Next.js
+inlines that value at build time, so **anybody who loads the page can read it**.
+Treat it as a shared local-development key, never as a production credential.
+The real fix is a Next.js route handler that proxies the API so the browser
+never holds a key; that is TODO 7.2 and it is not in this phase.
+
+### The secret store
+
+A secret holds a credential that a scrape needs: a Playwright `storageState`
+blob, or a password that `fill.valueFrom` names.
+
+```bash
+curl -X POST http://localhost:4000/secrets \
+  -H "X-API-Key: $API_KEY" -H 'Content-Type: application/json' \
+  -d '{"name":"court_session","value":"{\"cookies\":[]}"}'
+
+curl -H "X-API-Key: $API_KEY" http://localhost:4000/secrets
+curl -X DELETE -H "X-API-Key: $API_KEY" http://localhost:4000/secrets/<id>
+```
+
+`POST /secrets` encrypts the value with AES-256-GCM under
+`SECRET_ENCRYPTION_KEY` and stores the ciphertext. **The API never returns a
+plaintext secret and never returns a ciphertext.** `GET /secrets` returns names
+and timestamps only. `GET /definitions` returns the config, which holds a secret
+*name*, never a value. Only the worker decrypts, and it decrypts one run's
+secrets one time.
+
+`SECRET_ENCRYPTION_KEY` must decode to exactly 32 bytes from base64 or from hex.
+A wrong length fails loudly on the first use. Generate one with
+`openssl rand -base64 32`. Lose it and every stored secret is unreadable; there
+is no recovery.
+
+### The four auth modes
+
+```ts
+type AuthConfig =
+  | { mode: 'none' }
+  | { mode: 'storageState'; secretRef: string }
+  | { mode: 'cdp'; endpointUrl: string }
+  | { mode: 'chromeProfile'; userDataDir: string; profileDirectory?: string }
+  | { mode: 'login'; secretRef?: string; steps: Step[] };
+```
+
+| Mode | Where it runs | What it does |
+| --- | --- | --- |
+| `none` | anywhere | A fresh, empty context. This is the default. |
+| `storageState` | anywhere | Reads the named secret, parses it as a Playwright `storageState` blob, and passes it to `browser.newContext`. **This is the production path.** |
+| `cdp` | local worker | Attaches to a Chrome that the user already runs, so the user's live cookies apply. |
+| `chromeProfile` | local worker | Copies the user's Chrome profile and launches a persistent context on the copy. **The most reliable path for a one-off job on the user's own machine.** |
+| `login` | anywhere | Replays declarative steps to obtain a session, then saves it to the named secret for reuse. |
+
+A secret that a config names but the store does not hold fails the run with
+`AUTH_FAILED`.
+
+**`cdp`.** Start Chrome with a debug port, then point the definition at it:
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222
+```
+
+```json
+{ "mode": "cdp", "endpointUrl": "http://127.0.0.1:9222" }
+```
+
+It needs `ALLOW_CDP=true` on the worker. The worker reuses the first context the
+browser already has, so the user's session applies. It never closes a browser it
+did not launch: it closes only the pages the run opened.
+
+**This mode cannot work from inside the Docker worker.** `127.0.0.1` in the
+container is the container, not the host, and `host.docker.internal` still needs
+Chrome to listen on every interface, which exposes a full debug port on the
+network. Run the worker on the host instead:
+
+```bash
+ALLOW_CDP=true npm run dev --workspace @scraper/worker
+```
+
+**`chromeProfile`.** Chrome holds an exclusive lock on a live profile, so the
+worker copies the named profile to a temporary directory first, launches a
+persistent context on the copy, and deletes the copy afterwards. The copy skips
+the cache directories, which are large and useless to a session.
+
+```json
+{
+  "mode": "chromeProfile",
+  "userDataDir": "/Users/you/Library/Application Support/Google/Chrome",
+  "profileDirectory": "Default"
+}
+```
+
+It needs `ALLOW_LOCAL_PROFILE=true`, a separate flag from `ALLOW_CDP` because
+reading the profile off the disk is a larger grant than attaching to a debug
+port the user already opened. It needs a real Chrome (`channel: 'chrome'`), not
+the bundled Chromium, and it needs the host filesystem, so it is a local-worker
+mode as well.
+
+**`login`.** The steps are ordinary step verbs, so a password comes from the
+secret store through `fill.valueFrom`:
+
+```json
+{
+  "mode": "login",
+  "secretRef": "court_session",
+  "steps": [
+    { "op": "goto", "url": "https://app.example.com/login" },
+    { "op": "fill", "selector": "#user", "valueFrom": "court_user" },
+    { "op": "fill", "selector": "#pw", "valueFrom": "court_pw" },
+    { "op": "click", "selector": "button[type=submit]" },
+    { "op": "waitFor", "selector": "#dashboard" }
+  ]
+}
+```
+
+After the steps run, the worker writes `context.storageState()` back to
+`secretRef`. The next run reuses that stored session and skips the login steps,
+as long as the session still holds one cookie that has not expired. A session
+cookie does not count, because it dies with the browser that created it.
+
+### The URL guard
+
+`assertSafeUrl` allows `http` and `https` only. It resolves the host and rejects
+every address that is not globally routable: loopback, `10/8`, `172.16/12`,
+`192.168/16`, `169.254/16`, `100.64/10`, multicast, reserved, and the IPv6
+equivalents `::1`, `fe80::/10`, `fc00::/7` and `ff00::/8`. An IPv4-mapped IPv6
+address is judged as the IPv4 address it carries.
+
+The guard runs in two places:
+
+- `POST /definitions`, on the definition URL. A rejected URL returns 400.
+- The worker, on every `goto` and `openLink` target, and again on the URL the
+  page landed on. The second check matters because a public name can resolve to
+  a private address later, and because a redirect can end on a different host.
+
+`ALLOW_PRIVATE_URLS=true` turns the address check off. The scheme check stays on
+in every case. Set it only to scrape a local fixture site.
+
+### Artifact downloads
+
+`GET /artifacts/:id/download` streams the object and sits behind the API key
+like every other route. A browser cannot put a header on an `<a href>`, so the
+run detail page calls `GET /artifacts/:id/url` server side and renders the
+short-lived presigned URL that MinIO returns. That URL expires in 15 minutes.
+
+The presigned URL points at MinIO directly, so `MINIO_ENDPOINT` must be a host
+the browser can reach. In the compose stack the API talks to `minio` over the
+Docker network, which the browser cannot resolve; the page falls back to the
+streaming URL there.
+
+### Manual check
+
+```bash
+API_BASE_URL=http://localhost:4000 API_KEY=... node scripts/manual/phase-4-auth.mjs
+```
+
+It proves that an unauthenticated request gets 401, that `/health` gets 200,
+that a secret round-trips without the value ever appearing in a response, and
+that the guard rejects a definition pointed at `http://169.254.169.254/`. It
+deletes every row it creates.
+
+## The API
+
+| Route | Purpose |
+| --- | --- |
+| `GET /definitions` | One page of definitions. A soft-deleted one never appears. |
+| `GET /definitions/:id` | One definition. A soft-deleted one still answers. |
+| `POST /definitions` | Create. It accepts a v1 or a v2 config and stores v2. |
+| `PUT /definitions/:id` | Update `name`, `url`, or `config`. Each is optional. |
+| `DELETE /definitions/:id` | Soft delete. The runs and artifacts stay readable. |
+| `GET /schedules` · `POST /schedules` · `PATCH /schedules/:id` | List, create, enable. |
+| `DELETE /schedules/:id` | Remove a schedule. |
+| `GET /runs` | One page of runs. It takes `?definitionId=` and `?status=`. |
+| `GET /runs/:id` | The run, its attempts, and its artifacts. |
+| `POST /runs` | Trigger a run. |
+| `POST /runs/:id/cancel` | Cancel a QUEUED or RUNNING run. |
+| `POST /runs/:id/rerun` | Start a new run from the same definition. |
+| `GET /runs/:id/artifacts` | The artifact rows of a run. |
+| `GET /runs/:id/artifacts.zip` | Every artifact of a run, as a streaming archive. |
+| `GET /artifacts/:id/download` | One artifact. |
+
+### Pagination
+
+`GET /runs` and `GET /definitions` return a page, not a bare array:
+
+```json
+{ "items": [ ... ], "nextCursor": "MjAyNi0wMS0wMV..." }
+```
+
+Pass `?limit=` (default 50, maximum 200) and `?cursor=`. The order is
+`created_at DESC, id DESC`, so a row that arrives during a walk never makes an
+earlier row repeat. `nextCursor` is `null` on the last page. An unreadable
+cursor starts again at page one.
+
+### Cancel
+
+A cancel marks the run `FAILED` and writes the error code `CANCELLED` on an
+attempt. The run status enum keeps its four values, because the error code
+already carries the reason. A QUEUED run also loses its BullMQ job. A RUNNING
+run keeps its worker process: the job is already locked, so the worker stops at
+its next write.
+
+### Retention
+
+The scheduler deletes runs older than `RETENTION_DAYS` (default 30) once an
+hour. It removes the storage objects first and the rows second, so a failure
+between the two leaves a row for the next sweep instead of an orphan object in
+MinIO. Set `RETENTION_DAYS=0` to keep everything.
 
 ## End-to-end walkthrough
 
@@ -276,6 +607,24 @@ they become `extract.emit`. `PNG` and `HTML` become a capture. `WEBM` becomes
 6. **Stale run:** start a run, then `docker compose kill worker`. The attempt
    stops its heartbeat. Within `STALE_ATTEMPT_MINUTES` the scheduler marks the
    attempt and the run `FAILED` with the error code `STALE`.
+7. **Export:** on a `SUCCEEDED` run, click **Download all as ZIP**, or run
+   `npm run export -- --run <run-id> --out ./receipts`.
+
+To prove the delivery path against a fixture site, run the manual script. Part
+one needs only Chromium. Part two needs Postgres and MinIO, and it deletes every
+row and object that it creates:
+
+```bash
+npm run build
+node scripts/manual/phase-5-export.mjs
+```
+
+To prove the CourtReserve job against a Kendo-shaped fixture, with no stack and
+no live session:
+
+```bash
+node scripts/manual/phase-9-courtreserve-fixture.mjs
+```
 
 ## Run reliability
 
@@ -309,22 +658,6 @@ node scripts/manual/phase-3-scheduler.mjs "$DATABASE_URL"
 ```
 
 Both scripts remove every row that they write.
-
-## API
-
-| Route | Purpose |
-| --- | --- |
-| `GET /health` | Liveness probe |
-| `GET /definitions` | List every definition |
-| `POST /definitions` | Create a definition (`name`, `url`, `config`) |
-| `GET /schedules` | List schedules, optionally `?definitionId=` |
-| `POST /schedules` | Create a schedule (`definitionId`, `cron`, `timezone`, `enabled`) |
-| `PATCH /schedules/:id` | Enable or disable a schedule (`enabled`) |
-| `GET /runs` | List runs, optionally `?definitionId=` |
-| `GET /runs/:id` | Read one run with its attempts and artifacts |
-| `POST /runs` | Trigger a run |
-| `GET /runs/:runId/artifacts` | List the artifacts of a run |
-| `GET /artifacts/:id/download` | Download one artifact |
 
 ### `POST /runs`
 
@@ -368,6 +701,8 @@ level. Output is pretty-printed unless `NODE_ENV=production`.
 ```bash
 cp .env.example .env
 npm install
+npm run postinstall:browsers   # downloads Chromium; see the prerequisite below
+npm run lint
 npm run typecheck
 npm test
 ```
@@ -379,6 +714,87 @@ docker compose up -d postgres redis minio minio-bootstrap
 npm run migrate
 npm run dev --workspace @scraper/web   # etc.
 ```
+
+### Playwright browsers are a separate download
+
+The worker drives a real Chromium. Docker images get it from the Playwright base
+image, but a local worker and the end-to-end test do not. Install it once:
+
+```bash
+npx playwright install chromium
+# or, the same thing through the workspace script:
+npm run postinstall:browsers
+```
+
+Nothing installs the browser automatically, because the download is about 150 MB.
+Without it the worker and the end-to-end test fail to launch a browser.
+
+## Scripts
+
+| Script | Purpose |
+| --- | --- |
+| `npm run lint` | ESLint over `packages/*`, `apps/api`, `apps/worker`, `apps/scheduler` |
+| `npm run lint:fix` | The same, with autofix |
+| `npm run format` | Prettier over the repository |
+| `npm run format:check` | Prettier in check mode (used by review, not by CI) |
+| `npm run typecheck` | `tsc -b` over every non-web project |
+| `npm test` | The unit suite. Needs no Docker |
+| `npm run test:integration:up` | Start Postgres, Redis, and MinIO for the integration suite |
+| `npm run test:integration` | The integration and end-to-end suites |
+| `npm run test:integration:down` | Stop and remove those services |
+| `npm run postinstall:browsers` | `npx playwright install chromium` |
+
+`apps/web` keeps its own configuration. Lint and typecheck it with
+`npm run lint --workspace @scraper/web` and
+`npm run check-types --workspace @scraper/web`.
+
+## Tests
+
+### Unit suite
+
+```bash
+npm test
+```
+
+It runs `vitest` over every `src/**/__tests__/**/*.test.ts` file, then the
+`apps/web` suite. It uses fakes only, so it needs no Docker and no network.
+
+### Integration and end-to-end suite
+
+The integration suite runs every repository query against a real Postgres, and
+exercises real Redis and real MinIO. The end-to-end test creates a definition
+over HTTP, triggers a run, drives a real Chromium against a fixture site served
+by the test, and downloads the artifacts.
+
+```bash
+npm run test:integration:up     # postgres :55432, redis :56379, minio :59000
+npm run test:integration
+npm run test:integration:down
+```
+
+`docker-compose.test.yml` publishes the three services on non-default host
+ports and keeps their state in `tmpfs`, so it runs beside your own
+`docker compose up` without a clash and leaves nothing behind.
+
+When the services are not reachable the suite prints the reason and skips every
+test, so the command stays usable offline. Set `INTEGRATION_REQUIRED=1` to make
+an unreachable service a failure instead; CI sets it.
+
+Override any endpoint with `TEST_DATABASE_URL`, `TEST_REDIS_URL`,
+`TEST_MINIO_ENDPOINT`, `TEST_MINIO_PORT`, `TEST_MINIO_ACCESS_KEY`,
+`TEST_MINIO_SECRET_KEY`, or `TEST_MINIO_BUCKET`.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every push and every pull request:
+
+1. `lint-typecheck-unit`: `npm ci`, `npm run lint`, `npm run typecheck`,
+   `npm run check-types --workspace @scraper/web`, `npm test`.
+2. `integration`: the same install, then `npx playwright install --with-deps
+   chromium`, then `npm run test:integration` against Postgres, Redis, and MinIO
+   service containers.
+
+Only the second job downloads a browser.
 
 ## Migrations
 
@@ -415,7 +831,14 @@ All configuration is read from the environment (see `.env.example`):
 | `WORKER_CONCURRENCY` | Worker job concurrency |
 | `RUN_TIMEOUT_MS` | Hard limit on one scrape, in milliseconds (default `120000`) |
 | `STALE_ATTEMPT_MINUTES` | How long an attempt may go without a heartbeat before the scheduler fails it (default `10`) |
+| `API_KEY` | The value that `X-API-Key` must match. Empty runs the API open, except in production, where the API refuses to start |
+| `SECRET_ENCRYPTION_KEY` | 32 bytes as base64 or hex. It encrypts every stored secret |
+| `ALLOW_PRIVATE_URLS` | `true` lets the platform fetch a loopback, private or link-local URL |
+| `ALLOW_CDP` | `true` lets `auth.mode=cdp` attach to a running Chrome. Local worker only |
+| `ALLOW_LOCAL_PROFILE` | `true` lets `auth.mode=chromeProfile` copy a Chrome profile. Local worker only |
+| `RETENTION_DAYS` | Delete runs older than this many days. 0 disables the sweeper (default 30) |
 | `NEXT_PUBLIC_API_BASE_URL` | Base URL the web frontend uses to reach the `api` service (falls back to `API_BASE_URL`, then `http://localhost:4000`) |
+| `NEXT_PUBLIC_API_KEY` | The API key for browser calls. It is baked into the bundle and is therefore public |
 
 ## Web frontend (`apps/web`)
 
@@ -437,3 +860,36 @@ npm run test --workspace @scraper/web
 Manual flow: create a definition → open it → add a schedule and toggle
 enable/disable → click **Run** → open the run from history → view attempts and
 download artifacts for a completed run.
+
+### The step program editor
+
+`/definitions/new` and `/definitions/[id]/edit` both build a v2 step program.
+The editor has two modes. The **Form** mode edits one step at a time. The
+**JSON** mode edits the whole program as text.
+
+Form mode:
+
+- **Auth mode** picks `none`, `storageState`, `cdp`, or `login`. A
+  `storageState` or a `login` mode names a secret. The name is not the secret.
+  The editor never shows a secret value.
+- **Add step** appends a step. The verb select on a step changes its verb, and
+  the step then shows only the fields of that verb.
+- **Up**, **Down**, and **Remove** reorder and delete a step.
+- `forEach`, `openLink`, and `paginate` hold nested steps. The editor renders
+  them as an indented child list with the same controls.
+- The form nests 3 levels deep. A step below the cap shows a note and points at
+  the JSON editor. The cap is visual. A deeper program still runs, and a save
+  keeps it.
+
+JSON mode:
+
+- The textarea holds the current program.
+- The program is checked when the textarea loses focus.
+- An invalid program shows the error inline. The **Form** button and the save
+  button stay disabled until the program is valid again.
+- A round trip between the two modes keeps every field.
+
+To build the CourtReserve program, follow the numbered walkthrough in
+`docs/plans/phase-7-step-editor.md`.
+
+The edit page needs `GET /definitions/:id` and `PUT /definitions/:id`.

@@ -92,7 +92,10 @@ describe('goto', () => {
 describe('waitFor', () => {
   it('waits for a page-level selector', async () => {
     const context = pagedSite();
-    await run(context, [{ op: 'goto' }, { op: 'waitFor', selector: '#ready', state: 'attached' }]);
+    await run(context, [
+      { op: 'goto' },
+      { op: 'waitFor', selector: '#ready', state: 'attached' },
+    ]);
     expect(firstPageLog(context)).toContain('waitForSelector:#ready:attached');
   });
 
@@ -113,13 +116,18 @@ describe('click', () => {
 
   it('treats a missing optional target as a no-op', async () => {
     const context = pagedSite();
-    await run(context, [{ op: 'goto' }, { op: 'click', selector: 'a.nope', optional: true }]);
+    await run(context, [
+      { op: 'goto' },
+      { op: 'click', selector: 'a.nope', optional: true },
+    ]);
     expect(firstPageLog(context)).not.toContain('click');
   });
 
   it('fails on a missing target that is not optional', async () => {
     const context = pagedSite();
-    await expect(run(context, [{ op: 'goto' }, { op: 'click', selector: 'a.nope' }])).rejects.toThrow();
+    await expect(
+      run(context, [{ op: 'goto' }, { op: 'click', selector: 'a.nope' }]),
+    ).rejects.toThrow();
   });
 
   it('makes a newTab page current until goBack closes it', async () => {
@@ -158,12 +166,17 @@ describe('click', () => {
 describe('fill', () => {
   const formSite = (): FakeContext =>
     new FakeContext({
-      [LIST_URL]: () => ({ nodes: { '#password': [textNode('')], '#from': [textNode('')] } }),
+      [LIST_URL]: () => ({
+        nodes: { '#password': [textNode('')], '#from': [textNode('')] },
+      }),
     });
 
   it('fills a literal value', async () => {
     const context = formSite();
-    await run(context, [{ op: 'goto' }, { op: 'fill', selector: '#from', value: '05/02/2026' }]);
+    await run(context, [
+      { op: 'goto' },
+      { op: 'fill', selector: '#from', value: '05/02/2026' },
+    ]);
     expect(firstPageLog(context)).toContain('fill:05/02/2026');
   });
 
@@ -181,7 +194,10 @@ describe('fill', () => {
   it('throws AUTH_FAILED when the secret is absent', async () => {
     const context = formSite();
     await expect(
-      run(context, [{ op: 'goto' }, { op: 'fill', selector: '#password', valueFrom: 'court_pw' }]),
+      run(context, [
+        { op: 'goto' },
+        { op: 'fill', selector: '#password', valueFrom: 'court_pw' },
+      ]),
     ).rejects.toMatchObject({ code: 'AUTH_FAILED' });
   });
 });
@@ -189,7 +205,10 @@ describe('fill', () => {
 describe('select, press and scroll', () => {
   it('selects an option', async () => {
     const context = pagedSite();
-    await run(context, [{ op: 'goto' }, { op: 'select', selector: '#ready', value: '50' }]);
+    await run(context, [
+      { op: 'goto' },
+      { op: 'select', selector: '#ready', value: '50' },
+    ]);
     expect(firstPageLog(context)).toContain('select:50');
   });
 
@@ -201,7 +220,10 @@ describe('select, press and scroll', () => {
 
   it('scrolls an element into view', async () => {
     const context = pagedSite();
-    await run(context, [{ op: 'goto' }, { op: 'scroll', to: 'element', selector: '#ready' }]);
+    await run(context, [
+      { op: 'goto' },
+      { op: 'scroll', to: 'element', selector: '#ready' },
+    ]);
     expect(firstPageLog(context)).toContain('scrollIntoView');
   });
 
@@ -372,7 +394,10 @@ describe('openLink', () => {
       },
     ]);
 
-    expect(result.artifacts.map((a) => a.name)).toEqual(['receipt-0.png', 'receipt-1.png']);
+    expect(result.artifacts.map((a) => a.name)).toEqual([
+      'receipt-0.png',
+      'receipt-1.png',
+    ]);
     expect(result.artifacts.map((a) => a.body.toString('utf8'))).toEqual([
       'png:https://site.test/receipt/1',
       'png:https://site.test/receipt/2',
@@ -546,7 +571,11 @@ describe('paginate wrapping forEach wrapping openLink', () => {
                 op: 'openLink',
                 selector: 'a.receipt',
                 steps: [
-                  { op: 'capture', as: ['PNG'], name: 'p{{page}}-r{{index}}-{{row.date}}' },
+                  {
+                    op: 'capture',
+                    as: ['PNG'],
+                    name: 'p{{page}}-r{{index}}-{{row.date}}',
+                  },
                 ],
               },
             ],
@@ -562,7 +591,10 @@ describe('paginate wrapping forEach wrapping openLink', () => {
       'p2-r3-01-05-2026.png',
     ]);
     expect(result.datasets.rows).toHaveLength(4);
-    expect(result.artifacts.map((a) => a.name).slice(-2)).toEqual(['rows.json', 'rows.csv']);
+    expect(result.artifacts.map((a) => a.name).slice(-2)).toEqual([
+      'rows.json',
+      'rows.csv',
+    ]);
   });
 });
 
@@ -582,7 +614,9 @@ describe('limits', () => {
   }
 
   it('enforces maxSteps', async () => {
-    await expectLimit([{ op: 'goto' }, { op: 'goBack' }, { op: 'goBack' }], { maxSteps: 2 });
+    await expectLimit([{ op: 'goto' }, { op: 'goBack' }, { op: 'goBack' }], {
+      maxSteps: 2,
+    });
   });
 
   it('enforces maxPages', async () => {

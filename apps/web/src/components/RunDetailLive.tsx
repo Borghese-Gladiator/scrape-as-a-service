@@ -12,7 +12,15 @@ export const POLL_INTERVAL_MS = 2000;
  * server; this only re-polls while the run can still change, and the API
  * client is built in the browser so it resolves the public base URL.
  */
-export function RunDetailLive({ initialRun }: { initialRun: RunDetailType }) {
+export function RunDetailLive({
+  initialRun,
+  artifactDownloadUrl,
+  archiveUrl,
+}: {
+  initialRun: RunDetailType;
+  artifactDownloadUrl?: (artifactId: string) => string;
+  archiveUrl?: string;
+}) {
   const api = useMemo(() => getApiClient(), []);
   const [run, setRun] = useState(initialRun);
   const isLive = !RUN_COMPLETE_STATUSES.includes(run.status);
@@ -46,7 +54,11 @@ export function RunDetailLive({ initialRun }: { initialRun: RunDetailType }) {
           Live — this page refreshes every 2 seconds.
         </p>
       ) : null}
-      <RunDetail run={run} artifactDownloadUrl={(id) => api.artifactDownloadUrl(id)} />
+      <RunDetail
+        run={run}
+        artifactDownloadUrl={artifactDownloadUrl ?? ((id) => api.artifactDownloadUrl(id))}
+        archiveUrl={archiveUrl}
+      />
     </div>
   );
 }

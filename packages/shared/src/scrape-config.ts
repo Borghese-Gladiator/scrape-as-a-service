@@ -11,11 +11,21 @@ export const ARTIFACT_TYPES: readonly ArtifactType[] = [
   'PDF',
 ];
 
-export const V1_ARTIFACT_TYPES: readonly ArtifactType[] = ['JSON', 'CSV', 'PNG', 'HTML', 'WEBM'];
+export const V1_ARTIFACT_TYPES: readonly ArtifactType[] = [
+  'JSON',
+  'CSV',
+  'PNG',
+  'HTML',
+  'WEBM',
+];
 
 export const CAPTURE_TYPES: readonly CaptureType[] = ['PNG', 'PDF', 'HTML'];
 
-const WAIT_UNTIL_VALUES: readonly WaitUntil[] = ['load', 'domcontentloaded', 'networkidle'];
+const WAIT_UNTIL_VALUES: readonly WaitUntil[] = [
+  'load',
+  'domcontentloaded',
+  'networkidle',
+];
 
 export interface ScrapeFieldSelector {
   name: string;
@@ -48,12 +58,32 @@ export type AuthConfig =
   | { mode: 'none' }
   | { mode: 'storageState'; secretRef: string }
   | { mode: 'cdp'; endpointUrl: string }
+  | { mode: 'chromeProfile'; userDataDir: string; profileDirectory?: string }
   | { mode: 'login'; secretRef?: string; steps: Step[] };
+
+export const AUTH_MODES = [
+  'none',
+  'storageState',
+  'cdp',
+  'chromeProfile',
+  'login',
+] as const;
 
 export type Step =
   | { op: 'goto'; url?: string; waitUntil?: WaitUntil }
-  | { op: 'waitFor'; selector: string; timeoutMs?: number; state?: 'visible' | 'attached' }
-  | { op: 'click'; selector: string; opens?: 'same' | 'newTab'; timeoutMs?: number; optional?: boolean }
+  | {
+      op: 'waitFor';
+      selector: string;
+      timeoutMs?: number;
+      state?: 'visible' | 'attached';
+    }
+  | {
+      op: 'click';
+      selector: string;
+      opens?: 'same' | 'newTab';
+      timeoutMs?: number;
+      optional?: boolean;
+    }
   | { op: 'fill'; selector: string; value?: string; valueFrom?: string }
   | { op: 'select'; selector: string; value: string }
   | { op: 'press'; key: string }
@@ -185,23 +215,41 @@ function parseStep(input: unknown, path: string): Step {
   switch (op) {
     case 'goto': {
       const url = optionalString(input.url, `${path}.url`);
-      const waitUntil = optionalEnum(input.waitUntil, WAIT_UNTIL_VALUES, `${path}.waitUntil`);
+      const waitUntil = optionalEnum(
+        input.waitUntil,
+        WAIT_UNTIL_VALUES,
+        `${path}.waitUntil`,
+      );
       const step: Step = { op: 'goto' };
       if (url !== undefined) step.url = url;
       if (waitUntil !== undefined) step.waitUntil = waitUntil;
       return step;
     }
     case 'waitFor': {
-      const step: Step = { op: 'waitFor', selector: requireString(input.selector, `${path}.selector`) };
+      const step: Step = {
+        op: 'waitFor',
+        selector: requireString(input.selector, `${path}.selector`),
+      };
       const timeoutMs = optionalPositiveInt(input.timeoutMs, `${path}.timeoutMs`);
-      const state = optionalEnum(input.state, ['visible', 'attached'] as const, `${path}.state`);
+      const state = optionalEnum(
+        input.state,
+        ['visible', 'attached'] as const,
+        `${path}.state`,
+      );
       if (timeoutMs !== undefined) step.timeoutMs = timeoutMs;
       if (state !== undefined) step.state = state;
       return step;
     }
     case 'click': {
-      const step: Step = { op: 'click', selector: requireString(input.selector, `${path}.selector`) };
-      const opens = optionalEnum(input.opens, ['same', 'newTab'] as const, `${path}.opens`);
+      const step: Step = {
+        op: 'click',
+        selector: requireString(input.selector, `${path}.selector`),
+      };
+      const opens = optionalEnum(
+        input.opens,
+        ['same', 'newTab'] as const,
+        `${path}.opens`,
+      );
       const timeoutMs = optionalPositiveInt(input.timeoutMs, `${path}.timeoutMs`);
       const optional = optionalBoolean(input.optional, `${path}.optional`);
       if (opens !== undefined) step.opens = opens;
@@ -237,7 +285,11 @@ function parseStep(input: unknown, path: string): Step {
     case 'scroll': {
       const to = requireEnum(input.to, ['bottom', 'element'] as const, `${path}.to`);
       if (to === 'element') {
-        return { op: 'scroll', to, selector: requireString(input.selector, `${path}.selector`) };
+        return {
+          op: 'scroll',
+          to,
+          selector: requireString(input.selector, `${path}.selector`),
+        };
       }
       return { op: 'scroll', to };
     }
@@ -268,7 +320,9 @@ function parseStep(input: unknown, path: string): Step {
       const step: Step = {
         op: 'capture',
         as: dedupe(
-          input.as.map((value, index) => requireEnum(value, CAPTURE_TYPES, `${path}.as[${index}]`)),
+          input.as.map((value, index) =>
+            requireEnum(value, CAPTURE_TYPES, `${path}.as[${index}]`),
+          ),
         ),
         name: requireString(input.name, `${path}.name`),
       };
@@ -312,20 +366,34 @@ function parseStep(input: unknown, path: string): Step {
 
 function parseAuth(input: unknown, path: string): AuthConfig {
   if (!isRecord(input)) fail(`${path} must be an object`);
-  const mode = requireEnum(
-    input.mode,
-    ['none', 'storageState', 'cdp', 'login'] as const,
-    `${path}.mode`,
-  );
+  const mode = requireEnum(input.mode, AUTH_MODES, `${path}.mode`);
   switch (mode) {
     case 'none':
       return { mode };
     case 'storageState':
       return { mode, secretRef: requireString(input.secretRef, `${path}.secretRef`) };
     case 'cdp':
-      return { mode, endpointUrl: requireString(input.endpointUrl, `${path}.endpointUrl`) };
+      return {
+        mode,
+        endpointUrl: requireString(input.endpointUrl, `${path}.endpointUrl`),
+      };
+    case 'chromeProfile': {
+      const auth: AuthConfig = {
+        mode,
+        userDataDir: requireString(input.userDataDir, `${path}.userDataDir`),
+      };
+      const profileDirectory = optionalString(
+        input.profileDirectory,
+        `${path}.profileDirectory`,
+      );
+      if (profileDirectory !== undefined) auth.profileDirectory = profileDirectory;
+      return auth;
+    }
     case 'login': {
-      const auth: AuthConfig = { mode, steps: parseNestedSteps(input.steps, `${path}.steps`) };
+      const auth: AuthConfig = {
+        mode,
+        steps: parseNestedSteps(input.steps, `${path}.steps`),
+      };
       const secretRef = optionalString(input.secretRef, `${path}.secretRef`);
       if (secretRef !== undefined) auth.secretRef = secretRef;
       return auth;
@@ -433,4 +501,31 @@ export function validateScrapeConfig(input: unknown): ScrapeConfig {
 /** Fill every missing limit from `DEFAULT_LIMITS`. */
 export function resolveLimits(limits: Limits | undefined): Required<Limits> {
   return { ...DEFAULT_LIMITS, ...limits };
+}
+
+function collectStepSecretRefs(steps: Step[], found: Set<string>): void {
+  for (const step of steps) {
+    if (step.op === 'fill' && step.valueFrom !== undefined) found.add(step.valueFrom);
+    if (step.op === 'forEach' || step.op === 'openLink' || step.op === 'paginate') {
+      collectStepSecretRefs(step.steps, found);
+    }
+  }
+}
+
+/**
+ * Every secret name that a config needs, from `auth` and from every nested
+ * `fill.valueFrom`. The worker resolves this list once before a run.
+ */
+export function collectSecretRefs(config: ScrapeConfig): string[] {
+  const found = new Set<string>();
+  const auth = config.auth;
+  if (auth) {
+    if (auth.mode === 'storageState') found.add(auth.secretRef);
+    if (auth.mode === 'login') {
+      if (auth.secretRef !== undefined) found.add(auth.secretRef);
+      collectStepSecretRefs(auth.steps, found);
+    }
+  }
+  collectStepSecretRefs(config.steps, found);
+  return [...found];
 }

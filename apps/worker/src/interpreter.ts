@@ -6,6 +6,7 @@ import type {
   ScrapeConfig,
   ScrapeFieldSelector,
   Step,
+  WaitUntil,
 } from '@scraper/shared';
 import { resolveLimits } from '@scraper/shared';
 import { toCsv } from './artifacts.js';
@@ -32,6 +33,12 @@ export interface ScrapeResult {
 export interface RunScrapeOptions {
   secrets?: Record<string, string>;
   now?: () => number;
+  /**
+   * Reject a navigation target. `runProgram` defaults it to a check that does
+   * nothing, so a unit test stays free of DNS. `runScrape`, the only path the
+   * worker uses, defaults it to the real guard.
+   */
+  assertUrl?: (url: string) => Promise<void>;
 }
 
 export class StepError extends Error {
@@ -79,6 +86,7 @@ interface ExecState {
   now: () => number;
   startedAt: number;
   secrets: Record<string, string>;
+  assertUrl: (url: string) => Promise<void>;
   pages: Page[];
   datasets: Record<string, Record<string, string | null>[]>;
   datasetMeta: Map<string, DatasetMeta>;
@@ -100,7 +108,9 @@ function currentPage(state: ExecState): Page {
 }
 
 function resolve(state: ExecState, frame: Frame, selector: string): Locator {
-  return frame.scope ? frame.scope.locator(selector) : currentPage(state).locator(selector);
+  return frame.scope
+    ? frame.scope.locator(selector)
+    : currentPage(state).locator(selector);
 }
 
 function countPage(state: ExecState): void {
@@ -167,11 +177,33 @@ async function pageSignature(
   return `${url}|${count}|${first.trim().slice(0, 200)}`;
 }
 
-async function runGoto(state: ExecState, step: Extract<Step, { op: 'goto' }>): Promise<void> {
+/**
+ * Check the target before the navigation, and the landing URL after it. The
+ * second check matters because a redirect can end on a different host.
+ */
+async function navigate(
+  state: ExecState,
+  page: Page,
+  url: string,
+  waitUntil: WaitUntil,
+): Promise<void> {
+  await state.assertUrl(url);
+  await page.goto(url, { waitUntil });
+  const landed = page.url();
+  if (landed !== url) await state.assertUrl(landed);
+}
+
+async function runGoto(
+  state: ExecState,
+  step: Extract<Step, { op: 'goto' }>,
+): Promise<void> {
   countPage(state);
-  await currentPage(state).goto(step.url ?? state.defaultUrl, {
-    waitUntil: step.waitUntil ?? 'load',
-  });
+  await navigate(
+    state,
+    currentPage(state),
+    step.url ?? state.defaultUrl,
+    step.waitUntil ?? 'load',
+  );
 }
 
 async function runWaitFor(
@@ -261,7 +293,9 @@ async function runExtract(
       rows.push(await readFields(locator.nth(i), step.fields));
     }
   } else {
-    rows.push(await readFields(frame.scope ?? currentPage(state).locator('body'), step.fields));
+    rows.push(
+      await readFields(frame.scope ?? currentPage(state).locator('body'), step.fields),
+    );
   }
 
   state.datasets[step.name] = (state.datasets[step.name] ?? []).concat(rows);
@@ -346,7 +380,7 @@ async function runOpenLink(
   const page = await state.context.newPage();
   state.pages.push(page);
   try {
-    await page.goto(target, { waitUntil: 'load' });
+    await navigate(state, page, target, 'load');
     await runSteps(state, step.steps, { scope: null, bindings: { ...frame.bindings } });
   } finally {
     state.pages.pop();
@@ -489,6 +523,7 @@ export async function runProgram(
     now,
     startedAt: now(),
     secrets: options.secrets ?? {},
+    assertUrl: options.assertUrl ?? (async () => {}),
     pages: [],
     datasets: {},
     datasetMeta: new Map(),

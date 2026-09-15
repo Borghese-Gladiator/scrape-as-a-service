@@ -1,53 +1,33 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  V1_ARTIFACT_TYPES,
-  type ArtifactType,
-  type CreateDefinitionInput,
-  type ScrapeFieldSelector,
-} from '@/lib/types';
+import type { ScrapeConfig } from '@/lib/types';
+import { createProgram } from '@/lib/steps';
+import { validateProgram } from '@/lib/program-validation';
+import { StepProgramEditor } from './StepProgramEditor';
 
-interface FieldRow {
+export interface DefinitionFormValue {
   name: string;
-  selector: string;
-  attribute: string;
+  url: string;
+  config: ScrapeConfig;
 }
 
-const EMPTY_FIELD: FieldRow = { name: '', selector: '', attribute: '' };
-
 export function DefinitionForm({
+  initialValue,
   onSubmit,
   submitting = false,
+  submitLabel = 'Create definition',
 }: {
-  onSubmit: (input: CreateDefinitionInput) => void;
+  initialValue?: DefinitionFormValue;
+  onSubmit: (value: DefinitionFormValue) => void;
   submitting?: boolean;
+  submitLabel?: string;
 }) {
-  const [name, setName] = useState('');
-  const [url, setUrl] = useState('');
-  const [waitFor, setWaitFor] = useState('');
-  const [rowSelector, setRowSelector] = useState('');
-  const [fields, setFields] = useState<FieldRow[]>([{ ...EMPTY_FIELD }]);
-  const [artifacts, setArtifacts] = useState<ArtifactType[]>(['JSON']);
+  const [name, setName] = useState(initialValue?.name ?? '');
+  const [url, setUrl] = useState(initialValue?.url ?? '');
+  const [config, setConfig] = useState<ScrapeConfig>(initialValue?.config ?? createProgram());
+  const [jsonError, setJsonError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  function updateField(index: number, patch: Partial<FieldRow>) {
-    setFields((prev) => prev.map((f, i) => (i === index ? { ...f, ...patch } : f)));
-  }
-
-  function addField() {
-    setFields((prev) => [...prev, { ...EMPTY_FIELD }]);
-  }
-
-  function removeField(index: number) {
-    setFields((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
-  }
-
-  function toggleArtifact(type: ArtifactType) {
-    setArtifacts((prev) =>
-      prev.includes(type) ? prev.filter((a) => a !== type) : [...prev, type],
-    );
-  }
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -61,36 +41,22 @@ export function DefinitionForm({
       setError('URL is required');
       return;
     }
-
-    const parsedFields: ScrapeFieldSelector[] = [];
-    for (const f of fields) {
-      if (f.name.trim().length === 0 && f.selector.trim().length === 0) continue;
-      if (f.name.trim().length === 0 || f.selector.trim().length === 0) {
-        setError('Each field needs both a name and a selector');
-        return;
-      }
-      const field: ScrapeFieldSelector = { name: f.name.trim(), selector: f.selector.trim() };
-      if (f.attribute.trim().length > 0) field.attribute = f.attribute.trim();
-      parsedFields.push(field);
-    }
-
-    if (parsedFields.length === 0) {
-      setError('At least one field selector is required');
+    if (jsonError !== null) {
+      setError('Fix the program JSON before you save');
       return;
     }
 
-    const config: CreateDefinitionInput['config'] = {
-      fields: parsedFields,
-      artifacts,
-    };
-    if (waitFor.trim().length > 0) config.waitFor = waitFor.trim();
-    if (rowSelector.trim().length > 0) config.rowSelector = rowSelector.trim();
+    const result = validateProgram(config);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
 
-    onSubmit({ name: name.trim(), url: url.trim(), config });
+    onSubmit({ name: name.trim(), url: url.trim(), config: result.config });
   }
 
   return (
-    <form onSubmit={handleSubmit} aria-label="Create scrape definition">
+    <form onSubmit={handleSubmit} aria-label="Scrape definition">
       <div className="field-row">
         <label htmlFor="def-name">Name</label>
         <input
@@ -111,91 +77,12 @@ export function DefinitionForm({
         />
       </div>
 
-      <div className="field-row">
-        <label htmlFor="def-waitfor">Wait for selector (optional)</label>
-        <input
-          id="def-waitfor"
-          value={waitFor}
-          onChange={(e) => setWaitFor(e.target.value)}
-          placeholder=".content-loaded"
-        />
-      </div>
-
-      <div className="field-row">
-        <label htmlFor="def-rowselector">Row selector (optional)</label>
-        <input
-          id="def-rowselector"
-          value={rowSelector}
-          onChange={(e) => setRowSelector(e.target.value)}
-          placeholder="table tr"
-        />
-      </div>
-
-      <div className="field-row">
-        <label>Field selectors</label>
-        {fields.map((field, index) => (
-          <div className="field-editor-row" key={index}>
-            <div>
-              <label htmlFor={`field-name-${index}`}>Field name</label>
-              <input
-                id={`field-name-${index}`}
-                value={field.name}
-                onChange={(e) => updateField(index, { name: e.target.value })}
-                placeholder="title"
-              />
-            </div>
-            <div>
-              <label htmlFor={`field-selector-${index}`}>Selector</label>
-              <input
-                id={`field-selector-${index}`}
-                value={field.selector}
-                onChange={(e) => updateField(index, { selector: e.target.value })}
-                placeholder="h1"
-              />
-            </div>
-            <div>
-              <label htmlFor={`field-attribute-${index}`}>Attribute (optional)</label>
-              <input
-                id={`field-attribute-${index}`}
-                value={field.attribute}
-                onChange={(e) => updateField(index, { attribute: e.target.value })}
-                placeholder="href"
-              />
-            </div>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => removeField(index)}
-              aria-label={`Remove field ${index + 1}`}
-              disabled={fields.length === 1}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-        <button type="button" className="secondary" onClick={addField}>
-          Add field
-        </button>
-      </div>
-
-      <div className="field-row">
-        <label>Requested artifacts</label>
-        <div className="inline">
-          {V1_ARTIFACT_TYPES.map((type) => (
-            <div className="checkbox-row" key={type}>
-              <input
-                id={`artifact-${type}`}
-                type="checkbox"
-                checked={artifacts.includes(type)}
-                onChange={() => toggleArtifact(type)}
-              />
-              <label htmlFor={`artifact-${type}`} style={{ margin: 0 }}>
-                {type}
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
+      <StepProgramEditor
+        config={config}
+        onChange={setConfig}
+        jsonError={jsonError}
+        onJsonError={setJsonError}
+      />
 
       {error ? (
         <p className="error" role="alert">
@@ -203,8 +90,8 @@ export function DefinitionForm({
         </p>
       ) : null}
 
-      <button type="submit" disabled={submitting}>
-        {submitting ? 'Creating…' : 'Create definition'}
+      <button type="submit" disabled={submitting || jsonError !== null}>
+        {submitting ? 'Saving…' : submitLabel}
       </button>
     </form>
   );

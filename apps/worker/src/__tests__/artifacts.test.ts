@@ -10,7 +10,12 @@ function csv(rows: Record<string, string | null>[]): string {
 
 describe('toCsv', () => {
   it('writes a header from the first row and one line per row', () => {
-    expect(csv([{ a: '1', b: '2' }, { a: '3', b: '4' }])).toBe('a,b\n1,2\n3,4');
+    expect(
+      csv([
+        { a: '1', b: '2' },
+        { a: '3', b: '4' },
+      ]),
+    ).toBe('a,b\n1,2\n3,4');
   });
 
   it.each([
@@ -32,7 +37,9 @@ describe('toCsv', () => {
   });
 
   it('uses the union of every row key and keeps first-seen order', () => {
-    expect(csv([{ a: '1' }, { b: '2' }, { a: '3', c: '4' }])).toBe('a,b,c\n1,,\n,2,\n3,,4');
+    expect(csv([{ a: '1' }, { b: '2' }, { a: '3', c: '4' }])).toBe(
+      'a,b,c\n1,,\n,2,\n3,,4',
+    );
   });
 
   it('quotes a header that holds a comma', () => {
@@ -44,7 +51,11 @@ function fakeStorage(): StorageClient {
   return {
     ensureBucket: vi.fn(async () => {}),
     put: vi.fn(
-      async (objectKey: string, body: Buffer, contentType: string): Promise<StoragePutResult> => ({
+      async (
+        objectKey: string,
+        body: Buffer,
+        contentType: string,
+      ): Promise<StoragePutResult> => ({
         objectKey,
         contentType,
         sizeBytes: body.length,

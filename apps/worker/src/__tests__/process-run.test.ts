@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Job } from 'bullmq';
 import type { QueryResult, QueryResultRow } from 'pg';
 import type { Queryable } from '@scraper/db';
-import type { ScrapeConfig, ScrapeJobData, StorageClient, StoragePutResult } from '@scraper/shared';
+import type {
+  ScrapeConfig,
+  ScrapeJobData,
+  StorageClient,
+  StoragePutResult,
+} from '@scraper/shared';
 import { ScrapeError } from '@scraper/shared';
 
 const runScrapeMock = vi.fn();
@@ -40,7 +45,12 @@ class FakeDb implements Queryable {
   runStatus = 'QUEUED';
   runFinishedAt: Date | null = null;
   attempts: AttemptRow[] = [];
-  artifacts: Array<{ type: string; name: string; step_index: number; object_key: string }> = [];
+  artifacts: Array<{
+    type: string;
+    name: string;
+    step_index: number;
+    object_key: string;
+  }> = [];
   heartbeats = 0;
   private seq = 0;
 
@@ -70,7 +80,12 @@ class FakeDb implements Queryable {
       return [];
     }
     if (text.includes('UPDATE scrape_run_attempts')) {
-      const [id, status, code, message] = values as [string, string, string | null, string | null];
+      const [id, status, code, message] = values as [
+        string,
+        string,
+        string | null,
+        string | null,
+      ];
       const attempt = this.attempts.find((a) => a.id === id)!;
       attempt.status = status;
       attempt.error_code = code;
@@ -84,7 +99,15 @@ class FakeDb implements Queryable {
       return [{ id: 'run-1', status, finished_at: this.runFinishedAt } as RunRow];
     }
     if (text.includes('FROM scrape_definitions')) {
-      return [{ id: 'def-1', name: 'd', url: 'https://x', config: DEF_CONFIG, created_at: new Date() }];
+      return [
+        {
+          id: 'def-1',
+          name: 'd',
+          url: 'https://x',
+          config: DEF_CONFIG,
+          created_at: new Date(),
+        },
+      ];
     }
     if (text.includes('INSERT INTO artifacts')) {
       const [, type, name, stepIndex, objectKey] = values as [
@@ -105,7 +128,11 @@ function fakeStorage(): StorageClient {
   return {
     ensureBucket: vi.fn(async () => {}),
     put: vi.fn(
-      async (objectKey: string, body: Buffer, contentType: string): Promise<StoragePutResult> => ({
+      async (
+        objectKey: string,
+        body: Buffer,
+        contentType: string,
+      ): Promise<StoragePutResult> => ({
         objectKey,
         contentType,
         sizeBytes: body.length,

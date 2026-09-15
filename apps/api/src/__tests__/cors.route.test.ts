@@ -13,7 +13,7 @@ const ALLOWED = 'http://localhost:3000';
 
 describe('CORS preflight on /definitions', () => {
   it('allows an origin from the allowlist', async () => {
-    const app = createServer(pool, queue, storage, [ALLOWED]);
+    const app = createServer(pool, queue, storage, { corsOrigins: [ALLOWED] });
 
     const res = await request(app)
       .options('/definitions')
@@ -29,7 +29,7 @@ describe('CORS preflight on /definitions', () => {
     { desc: 'another port', origin: 'http://localhost:9999' },
     { desc: 'another host', origin: 'https://evil.example.com' },
   ])('sends no allow-origin header for $desc', async ({ origin }) => {
-    const app = createServer(pool, queue, storage, [ALLOWED]);
+    const app = createServer(pool, queue, storage, { corsOrigins: [ALLOWED] });
 
     const res = await request(app)
       .options('/definitions')

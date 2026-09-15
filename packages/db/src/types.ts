@@ -10,7 +10,9 @@ export type CatchUpPolicy = 'skip' | 'runOnce';
 export const CATCH_UP_POLICIES: readonly CatchUpPolicy[] = ['skip', 'runOnce'];
 
 export function isCatchUpPolicy(value: unknown): value is CatchUpPolicy {
-  return typeof value === 'string' && (CATCH_UP_POLICIES as readonly string[]).includes(value);
+  return (
+    typeof value === 'string' && (CATCH_UP_POLICIES as readonly string[]).includes(value)
+  );
 }
 
 export interface ScrapeDefinition {
@@ -19,6 +21,7 @@ export interface ScrapeDefinition {
   url: string;
   config: ScrapeConfig;
   created_at: Date;
+  deleted_at: Date | null;
 }
 
 export interface ScrapeSchedule {
@@ -69,10 +72,24 @@ export interface Artifact {
   created_at: Date;
 }
 
+/** A secret row without its ciphertext. This is the only shape the API returns. */
+export interface SecretMeta {
+  id: string;
+  name: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
 export interface CreateDefinitionInput {
   name: string;
   url: string;
   config: ScrapeConfig;
+}
+
+export interface UpdateDefinitionInput {
+  name?: string;
+  url?: string;
+  config?: ScrapeConfig;
 }
 
 export interface CreateScheduleInput {
@@ -81,6 +98,17 @@ export interface CreateScheduleInput {
   timezone: string;
   enabled?: boolean;
   catchUp?: CatchUpPolicy;
+}
+
+/** One keyset page. `nextCursor` is null when the page is the last one. */
+export interface Page<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+export interface PageQuery {
+  limit?: number;
+  cursor?: string;
 }
 
 export interface RunDetail extends ScrapeRun {

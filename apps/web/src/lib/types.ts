@@ -34,6 +34,7 @@ export type AuthConfig =
   | { mode: 'none' }
   | { mode: 'storageState'; secretRef: string }
   | { mode: 'cdp'; endpointUrl: string }
+  | { mode: 'chromeProfile'; userDataDir: string; profileDirectory?: string }
   | { mode: 'login'; secretRef?: string; steps: Step[] };
 
 export type Step =
@@ -86,6 +87,13 @@ export interface ScrapeDefinition {
   url: string;
   config: ScrapeConfig;
   created_at: string;
+  deleted_at: string | null;
+}
+
+/** One keyset page. The list endpoints return this shape. */
+export interface Page<T> {
+  items: T[];
+  nextCursor: string | null;
 }
 
 export interface ScrapeSchedule {
@@ -145,6 +153,13 @@ export interface CreateDefinitionInput {
   config: ScrapeConfig | ScrapeConfigV1;
 }
 
+/** `PUT /definitions/:id` replaces the whole definition. */
+export interface UpdateDefinitionInput {
+  name: string;
+  url: string;
+  config: ScrapeConfig | ScrapeConfigV1;
+}
+
 export interface CreateScheduleInput {
   definitionId: string;
   cron: string;
@@ -156,6 +171,8 @@ export interface ApiClient {
   listDefinitions(): Promise<ScrapeDefinition[]>;
   getDefinition(id: string): Promise<ScrapeDefinition>;
   createDefinition(input: CreateDefinitionInput): Promise<ScrapeDefinition>;
+  updateDefinition(id: string, input: UpdateDefinitionInput): Promise<ScrapeDefinition>;
+  deleteDefinition(id: string): Promise<void>;
   listSchedules(definitionId?: string): Promise<ScrapeSchedule[]>;
   createSchedule(input: CreateScheduleInput): Promise<ScrapeSchedule>;
   toggleSchedule(id: string, enabled: boolean): Promise<ScrapeSchedule>;
@@ -164,6 +181,9 @@ export interface ApiClient {
   getRun(id: string): Promise<RunDetail>;
   listArtifacts(runId: string): Promise<Artifact[]>;
   artifactDownloadUrl(artifactId: string): string;
+  /** A short-lived object URL. The browser cannot send the API key on a link. */
+  artifactPresignedUrl(artifactId: string): Promise<string>;
+  runArchiveUrl(runId: string): string;
 }
 
 export const RUN_COMPLETE_STATUSES: readonly RunStatus[] = ['SUCCEEDED', 'FAILED'];

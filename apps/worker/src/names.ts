@@ -15,7 +15,8 @@ const MAX_NAME_LENGTH = 120;
 export function resolveNameTemplate(template: string, bindings: NameBindings): string {
   return template.replace(PLACEHOLDER, (_match, rawKey: string) => {
     const key = rawKey.trim();
-    if (key === 'index') return bindings.index === undefined ? '' : String(bindings.index);
+    if (key === 'index')
+      return bindings.index === undefined ? '' : String(bindings.index);
     if (key === 'page') return bindings.page === undefined ? '' : String(bindings.page);
     if (key.startsWith('row.')) {
       const field = key.slice('row.'.length);

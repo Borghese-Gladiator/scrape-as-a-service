@@ -33,7 +33,13 @@ class FakeDb implements Queryable {
       this.run.started_at = coalesces ? (this.run.started_at ?? at) : at;
     }
     if (status === 'SUCCEEDED' || status === 'FAILED') this.run.finished_at = at;
-    return { rows: [this.run] as unknown as R[], command: '', rowCount: 1, oid: 0, fields: [] };
+    return {
+      rows: [this.run] as unknown as R[],
+      command: '',
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    };
   }
 }
 

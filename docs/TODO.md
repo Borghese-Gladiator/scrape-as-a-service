@@ -33,6 +33,11 @@ CSS selectors, capture the entry page. See `apps/worker/src/scrape.ts` and
 `packages/shared/src/scrape-config.ts`.
 
 ### 1.1 No session, cookies, or credentials — P0
+
+**DONE (phase 4)** — `AuthConfig` has five modes: `none`, `storageState`, `cdp`,
+`chromeProfile` and `login`. `runScrape` builds the context that the mode asks
+for. `cdp` and `chromeProfile` are local-worker modes behind `ALLOW_CDP` and
+`ALLOW_LOCAL_PROFILE`. Credentials live in the secret store (3.3).
 `runScrape` calls `browser.newContext()` with an empty state
 (`apps/worker/src/scrape.ts:26`). There is no way to supply cookies, a Playwright
 `storageState`, HTTP basic auth, a bearer header, or a login step. Every
@@ -91,6 +96,11 @@ Related: there is no `PDF` artifact type. For receipts a PDF is often the better
 output than a PNG.
 
 ### 1.7 No local folder output — P0
+
+**DONE (phase 5)** — Three answers. `npm run run-local` runs a definition with
+no stack at all and writes every artifact straight into a folder.
+`GET /runs/:id/artifacts.zip` streams the whole run as one archive.
+`npm run export -- --run <id> --out ./folder` unpacks that archive to disk.
 Artifacts go to MinIO and come back one at a time through
 `GET /artifacts/:id/download`. There is no bulk export, no ZIP of a run, and no
 "write to this host directory" mode. Retrieving 50 receipts means 50 clicks.
@@ -223,11 +233,22 @@ front, so streaming requires a different MinIO call.
 ## 3. Security
 
 ### 3.1 No authentication or authorization anywhere — P1
+
+**DONE (phase 4)** — Every route except `/health` needs `X-API-Key` to match
+`API_KEY`, through a timing-safe comparison. An empty `API_KEY` stops the API
+from starting in production and logs a warning anywhere else. There is still no
+user model and no tenancy; a single shared key is the whole model.
 The API is fully open. Anyone who can reach port 4000 can list every definition,
 create definitions, and trigger runs. There is no API key, no session, no user
 model, and no tenancy. Combined with 3.2 this is the most serious gap.
 
 ### 3.2 Server-side request forgery through the definition URL — P1
+
+**DONE (phase 4)** — `assertSafeUrl` allows `http` and `https` only, resolves
+the host, and rejects every non-global address. It runs in `POST /definitions`
+and in the worker on every `goto` and `openLink` target plus the URL the page
+landed on, so a redirect cannot escape it. `ALLOW_PRIVATE_URLS=true` is the
+bypass. An allowlist is still open.
 `POST /definitions` accepts any `url` string
 (`apps/api/src/routes/definitions.ts:24`) and the worker navigates to it with a
 real browser. Nothing validates the scheme or the host. A caller can point a run
@@ -238,11 +259,22 @@ Fix: enforce `http`/`https`, resolve the host and reject private and
 link-local ranges, and offer an allowlist.
 
 ### 3.3 Credentials will need a secret store — P1
+
+**DONE (phase 4)** — The `secrets` table holds a name and an AES-256-GCM
+ciphertext under `SECRET_ENCRYPTION_KEY`. `POST /secrets`, `GET /secrets` and
+`DELETE /secrets/:id` manage it. The API never returns a plaintext value and
+never returns a ciphertext; only the worker decrypts. A config carries a secret
+name, never a value, so `GET /definitions` stays safe.
 Once 1.1 lands, cookies and passwords live in the definition. `config` is a
 plain JSONB column and the API returns definitions in full. Secrets must be
 stored separately, encrypted, and never returned by `GET /definitions`.
 
 ### 3.4 Artifact downloads are unauthenticated — P1
+
+**DONE (phase 4)** — `GET /artifacts/:id/download` sits behind the API key like
+every other route, and the stream stays. `GET /artifacts/:id/url` returns a
+15-minute presigned URL through `presignedGetUrl`, which the run detail page
+uses because a browser cannot put a header on a link.
 `GET /artifacts/:id/download` streams any artifact to any caller who knows the
 UUID. `presignedGetUrl` exists on the storage client but is never used.
 
@@ -251,27 +283,50 @@ UUID. `presignedGetUrl` exists on the storage client but is never used.
 ## 4. API and data model
 
 ### 4.1 No update or delete — P1
+
+**DONE (phase 5)** — `PUT /definitions/:id`, `DELETE /definitions/:id` as a soft
+delete through a new `deleted_at` column, and `DELETE /schedules/:id`. A
+soft-deleted definition leaves the list, still answers `GET /definitions/:id`,
+starts no new run, and makes its schedules stop firing.
 Definitions and schedules can only be created and listed. There is no
 `PUT /definitions/:id`, no `DELETE`, and no way to disable a definition. A typo
 in a selector means creating a second definition and living with the first
 forever.
 
 ### 4.2 No `GET /definitions/:id` — P2
+
+**DONE (phase 5)** — The route exists, and `apps/web/src/lib/api.ts` calls it
+instead of listing every definition.
 The web client works around this by listing every definition and filtering in
 memory (`apps/web/src/lib/api.ts:69`). This is O(all definitions) on every
 definition page load.
 
 ### 4.3 No pagination, filtering, or limits — P1
+
+**DONE (phase 5)** — `GET /runs` and `GET /definitions` take `?limit=` and
+`?cursor=`, order by `created_at DESC, id DESC`, and return
+`{ items, nextCursor }`. The limit defaults to 50 and clamps to 200.
+`GET /runs` also takes `?status=`. A date filter stays open.
 `listRuns` and `listDefinitions` return every row, ordered by `created_at DESC`,
 with no `LIMIT`. Run history grows without bound; a busy definition will make
 `GET /runs` return tens of thousands of rows. There is also no filter by status
 or by date.
 
 ### 4.4 No run cancellation and no re-run — P2
+
+**DONE (phase 5)** — `POST /runs/:id/cancel` removes the BullMQ job, marks the
+run FAILED, and records the error code `CANCELLED` on an attempt.
+`POST /runs/:id/rerun` creates a new run from the same definition. A cancel of a
+RUNNING run does not interrupt the worker process; Phase 3 owns that.
 A queued or running job cannot be stopped. A past run cannot be repeated without
 going through the definition again.
 
 ### 4.5 No retention or cleanup — P1
+
+**DONE (phase 5)** — `apps/scheduler/src/retention.ts` deletes runs older than
+`RETENTION_DAYS` every hour. It removes the storage objects first and the rows
+second, so a crash between the two leaves no orphan in MinIO. `RETENTION_DAYS=0`
+disables the sweeper.
 Nothing ever deletes artifacts from MinIO or rows from Postgres. Storage grows
 monotonically. There is no TTL on artifacts and no archive policy.
 
@@ -325,7 +380,7 @@ network trace. Debugging a broken selector means reproducing it by hand.
 
 ## 6. Testing
 
-### 6.1 No integration tests — P1
+### 6.1 No integration tests — P1 — **DONE (phase 8)**
 Every test uses a fake or a mock. `packages/db` tests run against a fake pg
 client, so no SQL in the repository layer is ever executed. A syntax error or a
 column typo in any query passes the whole suite. Nothing runs against real
@@ -334,7 +389,7 @@ Postgres, Redis, or MinIO.
 Fix: add a `--runintegration` style suite with testcontainers or a compose
 fixture, and run every repository query against a real database.
 
-### 6.2 No end-to-end test — P1
+### 6.2 No end-to-end test — P1 — **DONE (phase 8)**
 Nothing exercises create-definition to artifact-download through the running
 stack. The CORS failure in 2.1 is exactly the class of bug an end-to-end test
 catches and unit tests cannot.
@@ -352,7 +407,7 @@ direct test, despite hand-rolled quoting and escaping. `validateScrapeConfig` is
 covered only indirectly through an API route test. `apps/api` route tests cover
 2 of the 4 routers: `schedules` and `artifacts` have none.
 
-### 6.4 No CI — P1
+### 6.4 No CI — P1 — **DONE (phase 8)**
 There is no `.github/workflows` directory and no pipeline configuration of any
 kind. Nothing runs typecheck, lint, or tests on a push.
 
@@ -360,7 +415,7 @@ kind. Nothing runs typecheck, lint, or tests on a push.
 
 ## 7. Build, ops, and developer experience
 
-### 7.1 No lint or format at the root — P2
+### 7.1 No lint or format at the root — P2 — **DONE (phase 8)**
 Only `apps/web` has an eslint config. `packages/*` and the other two apps are
 unlinted. There is no Prettier config, so formatting is by convention only. The
 root `package.json` has no `lint` or `format` script.
@@ -371,17 +426,17 @@ this, but it is a persistent sharp edge. A runtime-configured base URL, fetched
 from a `/config` endpoint or read by a route handler proxy, removes it. Fixing
 2.1 with a Next.js proxy removes this problem as a side effect.
 
-### 7.3 The worker image is not pruned — P2
+### 7.3 The worker image is not pruned — P2 — **DONE (phase 8)**
 `apps/worker/Dockerfile` is single-stage on the Playwright base image. It keeps
 dev dependencies, TypeScript, and all source. The API and scheduler Dockerfiles
 should be checked for the same.
 
-### 7.4 `cron-parser` v4 is deprecated — P2
+### 7.4 `cron-parser` v4 is deprecated — P2 — **DONE (phase 8)**
 `npm ci` warns: "v4 is no longer maintained, upgrade to v5". Only
 `packages/shared/src/cron.ts` uses it, and it has test coverage, so the upgrade
 is cheap.
 
-### 7.5 Playwright browsers are a hidden local prerequisite — P2
+### 7.5 Playwright browsers are a hidden local prerequisite — P2 — **DONE (phase 8)**
 Running the worker outside Docker requires `npx playwright install chromium`.
 The README does not say so.
 

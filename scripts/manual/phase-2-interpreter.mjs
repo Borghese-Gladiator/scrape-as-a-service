@@ -17,6 +17,10 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..');
 
+// Phase 4 put an SSRF guard on every navigation. The fixture server listens on
+// 127.0.0.1, which the guard rejects by default.
+process.env.ALLOW_PRIVATE_URLS = 'true';
+
 // playwright is a dependency of the worker workspace, not of the repo root.
 const requireFromWorker = createRequire(join(repoRoot, 'apps/worker/package.json'));
 const { chromium } = requireFromWorker('playwright');
@@ -177,19 +181,27 @@ async function main() {
     console.log(`rows extracted: ${result.datasets.rows?.length ?? 0}`);
     console.log('artifacts:');
     for (const artifact of result.artifacts) {
-      console.log(`  ${artifact.type.padEnd(4)} ${artifact.name} (${artifact.body.length} bytes)`);
+      console.log(
+        `  ${artifact.type.padEnd(4)} ${artifact.name} (${artifact.body.length} bytes)`,
+      );
     }
 
     const problems = [];
     if (result.artifacts.length !== EXPECTED_TOTAL) {
-      problems.push(`expected ${EXPECTED_TOTAL} artifacts, got ${result.artifacts.length}`);
+      problems.push(
+        `expected ${EXPECTED_TOTAL} artifacts, got ${result.artifacts.length}`,
+      );
     }
     const pngCount = result.artifacts.filter((a) => a.type === 'PNG').length;
     const pdfCount = result.artifacts.filter((a) => a.type === 'PDF').length;
-    if (pngCount !== ROWS.length) problems.push(`expected ${ROWS.length} PNG, got ${pngCount}`);
-    if (pdfCount !== ROWS.length) problems.push(`expected ${ROWS.length} PDF, got ${pdfCount}`);
+    if (pngCount !== ROWS.length)
+      problems.push(`expected ${ROWS.length} PNG, got ${pngCount}`);
+    if (pdfCount !== ROWS.length)
+      problems.push(`expected ${ROWS.length} PDF, got ${pdfCount}`);
     if ((result.datasets.rows?.length ?? 0) !== ROWS.length) {
-      problems.push(`expected ${ROWS.length} rows, got ${result.datasets.rows?.length ?? 0}`);
+      problems.push(
+        `expected ${ROWS.length} rows, got ${result.datasets.rows?.length ?? 0}`,
+      );
     }
     for (const row of ROWS) {
       const expected = `receipt-p${row.page}-r${ROWS.indexOf(row)}-${row.receipt.toLowerCase()}.png`;

@@ -19,7 +19,9 @@ function listeningPort(server: Server, fallback: number): number {
 }
 
 /** Run a minimal HTTP server that answers GET /health and nothing else. */
-export async function startHealthServer(options: HealthServerOptions): Promise<HealthServer> {
+export async function startHealthServer(
+  options: HealthServerOptions,
+): Promise<HealthServer> {
   const { port, details, logger } = options;
 
   const server = createServer((req, res) => {

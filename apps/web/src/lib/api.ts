@@ -3,10 +3,12 @@ import type {
   Artifact,
   CreateDefinitionInput,
   CreateScheduleInput,
+  Page,
   RunDetail,
   ScrapeDefinition,
   ScrapeRun,
   ScrapeSchedule,
+  UpdateDefinitionInput,
 } from './types';
 
 const DEFAULT_BASE_URL = 'http://localhost:4000';
@@ -41,10 +43,28 @@ function resolvePublicBaseUrl(explicit?: string): string {
   return (publicUrl && publicUrl.length > 0 ? publicUrl : DEFAULT_BASE_URL).replace(/\/$/, '');
 }
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
+/**
+ * The API needs `X-API-Key` on every route except `/health`. Server-side calls
+ * read the server-only `API_KEY`. The browser has no way to read that, so it
+ * falls back to `NEXT_PUBLIC_API_KEY`, which is baked into the bundle and is
+ * therefore visible to anybody who loads the page. See the README.
+ */
+function apiKeyHeader(): Record<string, string> {
+  const key =
+    typeof window === 'undefined'
+      ? (process.env.API_KEY ?? process.env.NEXT_PUBLIC_API_KEY)
+      : process.env.NEXT_PUBLIC_API_KEY;
+  return key && key.length > 0 ? { 'X-API-Key': key } : {};
+}
+
+async function send(url: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(url, {
     cache: 'no-store',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...apiKeyHeader(),
+      ...(init?.headers ?? {}),
+    },
     ...init,
   });
   if (!res.ok) {
@@ -57,7 +77,17 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     }
     throw new Error(message);
   }
+  return res;
+}
+
+async function request<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await send(url, init);
   return (await res.json()) as T;
+}
+
+/** `DELETE` answers `204 No Content`, so there is no body to parse. */
+async function requestVoid(url: string, init?: RequestInit): Promise<void> {
+  await send(url, init);
 }
 
 export function getApiClient(baseUrl?: string): ApiClient {
@@ -65,20 +95,27 @@ export function getApiClient(baseUrl?: string): ApiClient {
   const publicBase = resolvePublicBaseUrl(baseUrl);
 
   return {
-    listDefinitions() {
-      return request<ScrapeDefinition[]>(`${base}/definitions`);
+    async listDefinitions() {
+      const page = await request<Page<ScrapeDefinition>>(`${base}/definitions`);
+      return page.items;
     },
-    async getDefinition(id: string) {
-      const all = await request<ScrapeDefinition[]>(`${base}/definitions`);
-      const found = all.find((d) => d.id === id);
-      if (!found) throw new Error('definition not found');
-      return found;
+    getDefinition(id: string) {
+      return request<ScrapeDefinition>(`${base}/definitions/${encodeURIComponent(id)}`);
     },
     createDefinition(input: CreateDefinitionInput) {
       return request<ScrapeDefinition>(`${base}/definitions`, {
         method: 'POST',
         body: JSON.stringify(input),
       });
+    },
+    updateDefinition(id: string, input: UpdateDefinitionInput) {
+      return request<ScrapeDefinition>(`${base}/definitions/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      });
+    },
+    deleteDefinition(id: string) {
+      return requestVoid(`${base}/definitions/${encodeURIComponent(id)}`, { method: 'DELETE' });
     },
     listSchedules(definitionId?: string) {
       const query = definitionId ? `?definitionId=${encodeURIComponent(definitionId)}` : '';
@@ -102,9 +139,10 @@ export function getApiClient(baseUrl?: string): ApiClient {
         body: JSON.stringify({ definitionId }),
       });
     },
-    listRuns(definitionId?: string) {
+    async listRuns(definitionId?: string) {
       const query = definitionId ? `?definitionId=${encodeURIComponent(definitionId)}` : '';
-      return request<ScrapeRun[]>(`${base}/runs${query}`);
+      const page = await request<Page<ScrapeRun>>(`${base}/runs${query}`);
+      return page.items;
     },
     getRun(id: string) {
       return request<RunDetail>(`${base}/runs/${encodeURIComponent(id)}`);
@@ -114,6 +152,15 @@ export function getApiClient(baseUrl?: string): ApiClient {
     },
     artifactDownloadUrl(artifactId: string) {
       return `${publicBase}/artifacts/${encodeURIComponent(artifactId)}/download`;
+    },
+    async artifactPresignedUrl(artifactId: string) {
+      const body = await request<{ url: string }>(
+        `${base}/artifacts/${encodeURIComponent(artifactId)}/url`,
+      );
+      return body.url;
+    },
+    runArchiveUrl(runId: string) {
+      return `${publicBase}/runs/${encodeURIComponent(runId)}/artifacts.zip`;
     },
   };
 }

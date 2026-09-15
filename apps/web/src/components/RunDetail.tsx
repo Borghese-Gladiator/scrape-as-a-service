@@ -15,9 +15,11 @@ function formatBytes(bytes: number): string {
 export function RunDetail({
   run,
   artifactDownloadUrl,
+  archiveUrl,
 }: {
   run: RunDetailType;
   artifactDownloadUrl: (artifactId: string) => string;
+  archiveUrl?: string;
 }) {
   const isComplete = RUN_COMPLETE_STATUSES.includes(run.status);
 
@@ -109,6 +111,13 @@ export function RunDetail({
             </tbody>
           </table>
         )}
+        {isComplete && run.artifacts.length > 0 && archiveUrl ? (
+          <p>
+            <a href={archiveUrl} download>
+              Download all as ZIP
+            </a>
+          </p>
+        ) : null}
       </div>
     </div>
   );

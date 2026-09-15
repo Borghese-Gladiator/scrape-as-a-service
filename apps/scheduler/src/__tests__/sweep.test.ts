@@ -37,7 +37,12 @@ class FakeDb implements Queryable {
       );
     }
     if (text.includes('UPDATE scrape_run_attempts')) {
-      const [id, status, code, message] = values as [string, string, string | null, string | null];
+      const [id, status, code, message] = values as [
+        string,
+        string,
+        string | null,
+        string | null,
+      ];
       const attempt = this.attempts.find((a) => a.id === id)!;
       attempt.status = status;
       attempt.error_code = code;
@@ -77,7 +82,11 @@ describe('sweepOnce', () => {
   ])('leaves an attempt inside the window alone: %s', async (_label, fields) => {
     const db = new FakeDb([attempt(fields)]);
 
-    const swept = await sweepOnce({ pool: db, now: NOW, staleAttemptMinutes: STALE_MINUTES });
+    const swept = await sweepOnce({
+      pool: db,
+      now: NOW,
+      staleAttemptMinutes: STALE_MINUTES,
+    });
 
     expect(swept).toBe(0);
     expect(db.attempts[0]!.status).toBe('RUNNING');
@@ -90,7 +99,11 @@ describe('sweepOnce', () => {
   ])('fails an attempt outside the window and its run: %s', async (_label, fields) => {
     const db = new FakeDb([attempt(fields)]);
 
-    const swept = await sweepOnce({ pool: db, now: NOW, staleAttemptMinutes: STALE_MINUTES });
+    const swept = await sweepOnce({
+      pool: db,
+      now: NOW,
+      staleAttemptMinutes: STALE_MINUTES,
+    });
 
     expect(swept).toBe(1);
     expect(db.attempts[0]!.status).toBe('FAILED');
@@ -99,9 +112,15 @@ describe('sweepOnce', () => {
   });
 
   it('leaves an attempt that already finished alone', async () => {
-    const db = new FakeDb([attempt({ status: 'SUCCEEDED', started_at: minutesAgo(120) })]);
+    const db = new FakeDb([
+      attempt({ status: 'SUCCEEDED', started_at: minutesAgo(120) }),
+    ]);
 
-    const swept = await sweepOnce({ pool: db, now: NOW, staleAttemptMinutes: STALE_MINUTES });
+    const swept = await sweepOnce({
+      pool: db,
+      now: NOW,
+      staleAttemptMinutes: STALE_MINUTES,
+    });
 
     expect(swept).toBe(0);
     expect(db.runStatus.size).toBe(0);
