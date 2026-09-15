@@ -60,6 +60,9 @@ export async function pollOnce(deps: PollDeps): Promise<number> {
 
       const plan = planSchedule(schedule, now);
       const run = await createRun(tx, schedule.definition_id, 'SCHEDULE', schedule.id);
+      if (!run) {
+        throw new Error(`failed to create a run for schedule: ${schedule.id}`);
+      }
       await advanceSchedule(tx, schedule.id, plan.lastRunAt, plan.nextRunAt);
       return { runId: run.id, definitionId: schedule.definition_id };
     });
