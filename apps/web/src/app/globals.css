@@ -192,3 +192,41 @@ th {
 .artifact-links a {
   margin-right: 1rem;
 }
+
+.step {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem 1rem;
+  margin: 0 0 0.75rem;
+  min-width: 0;
+}
+
+.step legend {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 0 0.35rem;
+}
+
+.step-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.step-toolbar select {
+  width: auto;
+}
+
+.step-children {
+  border-left: 3px solid var(--border);
+  padding-left: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.json-editor {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}

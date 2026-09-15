@@ -707,3 +707,36 @@ npm run test --workspace @scraper/web
 Manual flow: create a definition → open it → add a schedule and toggle
 enable/disable → click **Run** → open the run from history → view attempts and
 download artifacts for a completed run.
+
+### The step program editor
+
+`/definitions/new` and `/definitions/[id]/edit` both build a v2 step program.
+The editor has two modes. The **Form** mode edits one step at a time. The
+**JSON** mode edits the whole program as text.
+
+Form mode:
+
+- **Auth mode** picks `none`, `storageState`, `cdp`, or `login`. A
+  `storageState` or a `login` mode names a secret. The name is not the secret.
+  The editor never shows a secret value.
+- **Add step** appends a step. The verb select on a step changes its verb, and
+  the step then shows only the fields of that verb.
+- **Up**, **Down**, and **Remove** reorder and delete a step.
+- `forEach`, `openLink`, and `paginate` hold nested steps. The editor renders
+  them as an indented child list with the same controls.
+- The form nests 3 levels deep. A step below the cap shows a note and points at
+  the JSON editor. The cap is visual. A deeper program still runs, and a save
+  keeps it.
+
+JSON mode:
+
+- The textarea holds the current program.
+- The program is checked when the textarea loses focus.
+- An invalid program shows the error inline. The **Form** button and the save
+  button stay disabled until the program is valid again.
+- A round trip between the two modes keeps every field.
+
+To build the CourtReserve program, follow the numbered walkthrough in
+`docs/plans/phase-7-step-editor.md`.
+
+The edit page needs `GET /definitions/:id` and `PUT /definitions/:id`.

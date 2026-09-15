@@ -8,6 +8,7 @@ import type {
   ScrapeDefinition,
   ScrapeRun,
   ScrapeSchedule,
+  UpdateDefinitionInput,
 } from './types';
 
 const DEFAULT_BASE_URL = 'http://localhost:4000';
@@ -56,7 +57,7 @@ function apiKeyHeader(): Record<string, string> {
   return key && key.length > 0 ? { 'X-API-Key': key } : {};
 }
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
+async function send(url: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(url, {
     cache: 'no-store',
     headers: {
@@ -76,7 +77,17 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     }
     throw new Error(message);
   }
+  return res;
+}
+
+async function request<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await send(url, init);
   return (await res.json()) as T;
+}
+
+/** `DELETE` answers `204 No Content`, so there is no body to parse. */
+async function requestVoid(url: string, init?: RequestInit): Promise<void> {
+  await send(url, init);
 }
 
 export function getApiClient(baseUrl?: string): ApiClient {
@@ -96,6 +107,15 @@ export function getApiClient(baseUrl?: string): ApiClient {
         method: 'POST',
         body: JSON.stringify(input),
       });
+    },
+    updateDefinition(id: string, input: UpdateDefinitionInput) {
+      return request<ScrapeDefinition>(`${base}/definitions/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      });
+    },
+    deleteDefinition(id: string) {
+      return requestVoid(`${base}/definitions/${encodeURIComponent(id)}`, { method: 'DELETE' });
     },
     listSchedules(definitionId?: string) {
       const query = definitionId ? `?definitionId=${encodeURIComponent(definitionId)}` : '';
