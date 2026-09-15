@@ -11,7 +11,9 @@ function fake() {
 describe('headedChromium', () => {
   it('forces a visible window, because Cloudflare blocks a headless one', async () => {
     const base = fake();
-    await headedChromium(base).launchPersistentContext('/tmp/profile', { channel: 'chrome' });
+    await headedChromium(base).launchPersistentContext('/tmp/profile', {
+      channel: 'chrome',
+    });
 
     expect(base.launchPersistentContext).toHaveBeenCalledWith('/tmp/profile', {
       channel: 'chrome',
@@ -21,9 +23,13 @@ describe('headedChromium', () => {
 
   it('overrides a headless option that the caller asked for', async () => {
     const base = fake();
-    await headedChromium(base).launchPersistentContext('/tmp/profile', { headless: true });
+    await headedChromium(base).launchPersistentContext('/tmp/profile', {
+      headless: true,
+    });
 
-    expect(base.launchPersistentContext).toHaveBeenCalledWith('/tmp/profile', { headless: false });
+    expect(base.launchPersistentContext).toHaveBeenCalledWith('/tmp/profile', {
+      headless: false,
+    });
   });
 
   it('leaves the cdp path untouched, because it reuses the user window', async () => {

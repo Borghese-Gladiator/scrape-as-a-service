@@ -44,16 +44,28 @@ async function main() {
   }
 
   const health = await call('/health', {}, false);
-  check(health.status === 200, `GET /health with no key returns 200 (got ${health.status})`);
+  check(
+    health.status === 200,
+    `GET /health with no key returns 200 (got ${health.status})`,
+  );
 
   const open = await call('/definitions', {}, false);
-  check(open.status === 401, `GET /definitions with no key returns 401 (got ${open.status})`);
+  check(
+    open.status === 401,
+    `GET /definitions with no key returns 401 (got ${open.status})`,
+  );
 
   const wrong = await call('/definitions', { headers: { 'X-API-Key': 'wrong' } }, false);
-  check(wrong.status === 401, `GET /definitions with a wrong key returns 401 (got ${wrong.status})`);
+  check(
+    wrong.status === 401,
+    `GET /definitions with a wrong key returns 401 (got ${wrong.status})`,
+  );
 
   const listed = await call('/definitions');
-  check(listed.status === 200, `GET /definitions with the key returns 200 (got ${listed.status})`);
+  check(
+    listed.status === 200,
+    `GET /definitions with the key returns 200 (got ${listed.status})`,
+  );
 
   let secretId = null;
   try {
@@ -109,7 +121,10 @@ async function main() {
   } finally {
     if (secretId) {
       const removed = await call(`/secrets/${secretId}`, { method: 'DELETE' });
-      check(removed.status === 204, `DELETE /secrets/:id returns 204 (got ${removed.status})`);
+      check(
+        removed.status === 204,
+        `DELETE /secrets/:id returns 204 (got ${removed.status})`,
+      );
       const after = await call('/secrets');
       check(
         !after.text.includes(SECRET_NAME),

@@ -24,7 +24,13 @@ function fakePool(captured: { config?: unknown }): Pool {
           },
         ];
       }
-      return { rows: rows as R[], command: '', rowCount: rows.length, oid: 0, fields: [] };
+      return {
+        rows: rows as R[],
+        command: '',
+        rowCount: rows.length,
+        oid: 0,
+        fields: [],
+      };
     },
   } as unknown as Pool;
 }
@@ -117,9 +123,15 @@ describe('POST /definitions config parsing', () => {
 
   it.each([
     { desc: 'empty fields', config: { fields: [], artifacts: ['JSON'] } },
-    { desc: 'bad artifact type', config: { fields: [{ name: 'a', selector: 'b' }], artifacts: ['EXE'] } },
+    {
+      desc: 'bad artifact type',
+      config: { fields: [{ name: 'a', selector: 'b' }], artifacts: ['EXE'] },
+    },
     { desc: 'missing selector', config: { fields: [{ name: 'a' }], artifacts: [] } },
-    { desc: 'unknown step verb', config: { version: 2, steps: [{ op: 'evaluate', code: 'alert(1)' }] } },
+    {
+      desc: 'unknown step verb',
+      config: { version: 2, steps: [{ op: 'evaluate', code: 'alert(1)' }] },
+    },
     { desc: 'empty step program', config: { version: 2, steps: [] } },
   ])('rejects invalid config: $desc', async ({ config }) => {
     const app = createServer(fakePool({}), queue, storage, HERMETIC);

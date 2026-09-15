@@ -17,7 +17,12 @@ function site(): FakeContext {
 }
 
 function run(steps: Step[], assertUrl: (url: string) => Promise<void>) {
-  return runProgram(site().asBrowserContext(), LIST_URL, { version: 2, steps }, { assertUrl });
+  return runProgram(
+    site().asBrowserContext(),
+    LIST_URL,
+    { version: 2, steps },
+    { assertUrl },
+  );
 }
 
 describe('the interpreter applies the URL guard', () => {
@@ -53,7 +58,8 @@ describe('the interpreter applies the URL guard', () => {
     },
   ])('stops the run when the guard rejects a $desc target', async ({ steps }) => {
     const assertUrl = vi.fn(async (url: string) => {
-      if (url.includes('receipt') || steps.length === 1) throw new Error('URL_NOT_ALLOWED');
+      if (url.includes('receipt') || steps.length === 1)
+        throw new Error('URL_NOT_ALLOWED');
     });
     await expect(run(steps, assertUrl)).rejects.toThrow('URL_NOT_ALLOWED');
   });

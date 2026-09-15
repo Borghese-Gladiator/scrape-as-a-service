@@ -6,7 +6,10 @@ const TIMEOUT_MS = 5000;
 
 const targets = [
   { name: 'api', url: `http://localhost:${process.env.API_PORT ?? '4000'}/health` },
-  { name: 'worker', url: `http://localhost:${process.env.WORKER_HEALTH_PORT ?? '4001'}/health` },
+  {
+    name: 'worker',
+    url: `http://localhost:${process.env.WORKER_HEALTH_PORT ?? '4001'}/health`,
+  },
   {
     name: 'scheduler',
     url: `http://localhost:${process.env.SCHEDULER_HEALTH_PORT ?? '4002'}/health`,

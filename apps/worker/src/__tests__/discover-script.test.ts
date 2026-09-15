@@ -3,9 +3,15 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { collectDiscovery } from '../cli/discover-script.js';
 
 /** The Kendo UI 2022.1 markup that CourtReserve is expected to serve. */
-function kendoPage(options: { nextDisabledClass?: string; receiptHref?: string } = {}): string {
-  const disabled = options.nextDisabledClass === undefined ? '' : ` ${options.nextDisabledClass}`;
-  const href = options.receiptHref === undefined ? ' href="/receipt/8DX6T13140"' : options.receiptHref;
+function kendoPage(
+  options: { nextDisabledClass?: string; receiptHref?: string } = {},
+): string {
+  const disabled =
+    options.nextDisabledClass === undefined ? '' : ` ${options.nextDisabledClass}`;
+  const href =
+    options.receiptHref === undefined
+      ? ' href="/receipt/8DX6T13140"'
+      : options.receiptHref;
   return `
   <div class="k-widget k-tabstrip" id="detail-tabs">
     <ul class="k-tabstrip-items" role="tablist">
@@ -100,7 +106,9 @@ describe('collectDiscovery', () => {
     document.body.innerHTML = kendoPage({ nextDisabledClass: className });
     const report = collectDiscovery();
 
-    const next = report.pagers[0]?.controls.find((c) => c.title === 'Go to the next page');
+    const next = report.pagers[0]?.controls.find(
+      (c) => c.title === 'Go to the next page',
+    );
     expect(next?.disabled).toBe(true);
   });
 
@@ -108,7 +116,9 @@ describe('collectDiscovery', () => {
     const report = collectDiscovery();
     const controls = report.pagers[0]?.controls ?? [];
 
-    expect(controls.find((c) => c.title === 'Go to the previous page')?.disabled).toBe(true);
+    expect(controls.find((c) => c.title === 'Go to the previous page')?.disabled).toBe(
+      true,
+    );
     expect(controls.find((c) => c.title === 'Go to the next page')).toMatchObject({
       disabled: false,
       text: '>',
@@ -119,8 +129,13 @@ describe('collectDiscovery', () => {
     const report = collectDiscovery();
 
     expect(report.tabStrips).toHaveLength(1);
-    expect(report.tabStrips[0]?.items.map((item) => item.text)).toEqual(['Unpaid', 'Payments']);
-    expect(report.tabStrips[0]?.items.find((item) => item.text === 'Payments')?.active).toBe(true);
+    expect(report.tabStrips[0]?.items.map((item) => item.text)).toEqual([
+      'Unpaid',
+      'Payments',
+    ]);
+    expect(
+      report.tabStrips[0]?.items.find((item) => item.text === 'Payments')?.active,
+    ).toBe(true);
   });
 
   it('reports the date inputs and skips an unrelated text input', () => {

@@ -114,7 +114,9 @@ describe('mode cdp', () => {
 
   it('throws AUTH_FAILED when ALLOW_CDP is off', async () => {
     const h = harness();
-    await expect(createAuthSession(auth, h.deps)).rejects.toMatchObject({ code: 'AUTH_FAILED' });
+    await expect(createAuthSession(auth, h.deps)).rejects.toMatchObject({
+      code: 'AUTH_FAILED',
+    });
     expect(h.connectOverCDP).not.toHaveBeenCalled();
   });
 
@@ -155,43 +157,51 @@ describe('mode chromeProfile', () => {
   it('throws AUTH_FAILED when ALLOW_LOCAL_PROFILE is off', async () => {
     const h = harness();
     const auth: AuthConfig = { mode: 'chromeProfile', userDataDir: '/nowhere' };
-    await expect(createAuthSession(auth, h.deps)).rejects.toMatchObject({ code: 'AUTH_FAILED' });
+    await expect(createAuthSession(auth, h.deps)).rejects.toMatchObject({
+      code: 'AUTH_FAILED',
+    });
     expect(h.launchPersistentContext).not.toHaveBeenCalled();
   });
 
   it.each([
     { desc: 'the default profile', profile: undefined, expected: 'Default' },
     { desc: 'a named profile', profile: 'Profile 1', expected: 'Profile 1' },
-  ])('launches a persistent context on a copy of $desc', async ({ profile, expected }) => {
-    const userDataDir = await chromeProfileFixture(expected);
-    const h = harness({ allowLocalProfile: true });
-    const auth = {
-      mode: 'chromeProfile' as const,
-      userDataDir,
-      ...(profile ? { profileDirectory: profile } : {}),
-    };
+  ])(
+    'launches a persistent context on a copy of $desc',
+    async ({ profile, expected }) => {
+      const userDataDir = await chromeProfileFixture(expected);
+      const h = harness({ allowLocalProfile: true });
+      const auth = {
+        mode: 'chromeProfile' as const,
+        userDataDir,
+        ...(profile ? { profileDirectory: profile } : {}),
+      };
 
-    const session = await createAuthSession(auth, h.deps);
+      const session = await createAuthSession(auth, h.deps);
 
-    expect(h.launchPersistentContext).toHaveBeenCalledTimes(1);
-    const [copyDir, options] = h.launchPersistentContext.mock.calls[0]!;
-    expect(copyDir).not.toBe(userDataDir);
-    expect(options).toMatchObject({
-      channel: 'chrome',
-      args: [`--profile-directory=${expected}`],
-    });
-    expect(await readdir(copyDir as string)).toContain(expected);
-    expect(await readdir(join(copyDir as string, expected))).toEqual(['Cookies']);
+      expect(h.launchPersistentContext).toHaveBeenCalledTimes(1);
+      const [copyDir, options] = h.launchPersistentContext.mock.calls[0]!;
+      expect(copyDir).not.toBe(userDataDir);
+      expect(options).toMatchObject({
+        channel: 'chrome',
+        args: [`--profile-directory=${expected}`],
+      });
+      expect(await readdir(copyDir as string)).toContain(expected);
+      expect(await readdir(join(copyDir as string, expected))).toEqual(['Cookies']);
 
-    await session.close();
-    await expect(readdir(copyDir as string)).rejects.toThrow();
-  });
+      await session.close();
+      await expect(readdir(copyDir as string)).rejects.toThrow();
+    },
+  );
 
   it('throws AUTH_FAILED when the profile directory is missing', async () => {
     const userDataDir = await chromeProfileFixture('Default');
     const h = harness({ allowLocalProfile: true });
     await expect(
-      createAuthSession({ mode: 'chromeProfile', userDataDir, profileDirectory: 'Gone' }, h.deps),
+      createAuthSession(
+        { mode: 'chromeProfile', userDataDir, profileDirectory: 'Gone' },
+        h.deps,
+      ),
     ).rejects.toMatchObject({ code: 'AUTH_FAILED' });
   });
 });
@@ -253,7 +263,11 @@ describe('isStoredStateFresh', () => {
   it.each([
     { desc: 'a cookie that expires later', raw: freshState(), fresh: true },
     { desc: 'a cookie that already expired', raw: staleState(), fresh: false },
-    { desc: 'a session cookie', raw: JSON.stringify({ cookies: [{ expires: -1 }] }), fresh: false },
+    {
+      desc: 'a session cookie',
+      raw: JSON.stringify({ cookies: [{ expires: -1 }] }),
+      fresh: false,
+    },
     { desc: 'no cookie at all', raw: JSON.stringify({ cookies: [] }), fresh: false },
     { desc: 'a value that is not JSON', raw: 'not json', fresh: false },
   ])('says $desc is fresh=$fresh', ({ raw, fresh }) => {

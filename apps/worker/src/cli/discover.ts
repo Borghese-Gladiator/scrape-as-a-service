@@ -74,7 +74,8 @@ export function authForOptions(options: DiscoverOptions): AuthConfig {
       mode: 'chromeProfile',
       userDataDir: options.userDataDir ?? DEFAULT_CHROME_USER_DATA_DIR,
     };
-    if (options.profileDirectory !== undefined) auth.profileDirectory = options.profileDirectory;
+    if (options.profileDirectory !== undefined)
+      auth.profileDirectory = options.profileDirectory;
     return auth;
   }
   return { mode: 'none' };
@@ -112,7 +113,11 @@ function receiptControl(report: DiscoveryReport, gridIndex: number) {
   return named ?? inGrid[0];
 }
 
-function controlSelector(control: { tag: string; id: string; classes: string[] }): string {
+function controlSelector(control: {
+  tag: string;
+  id: string;
+  classes: string[];
+}): string {
   if (control.id.length > 0) return `#${control.id}`;
   const useful = control.classes.filter((name) => !name.startsWith('k-state-'));
   if (useful.length === 0) return control.tag;
@@ -146,7 +151,12 @@ export function suggestions(report: DiscoveryReport): Suggestion[] {
   // A Kendo pager gives every arrow the class `k-pager-nav`, the previous one
   // included, so the class alone proves nothing. Only the label and the
   // direction icon tell next from previous.
-  const isNext = (control: { title: string | null; ariaLabel: string | null; text: string; classes: string[] }) =>
+  const isNext = (control: {
+    title: string | null;
+    ariaLabel: string | null;
+    text: string;
+    classes: string[];
+  }) =>
     /next/i.test(control.title ?? '') ||
     /next/i.test(control.ariaLabel ?? '') ||
     control.classes.includes('k-i-arrow-e') ||
@@ -195,7 +205,9 @@ export function suggestions(report: DiscoveryReport): Suggestion[] {
   }
 
   const usableHref =
-    control.href !== null && control.href.length > 0 && !control.href.startsWith('javascript:');
+    control.href !== null &&
+    control.href.length > 0 &&
+    !control.href.startsWith('javascript:');
   out.push({
     field: 'receipt control',
     selector: controlSelector(control),
@@ -234,7 +246,9 @@ export function formatReport(report: DiscoveryReport, log: (line: string) => voi
   if (report.rowControls.length === 0) log('  none');
   for (const control of report.rowControls) {
     log(`  grid[${control.gridIndex}] <${control.tag}> ${JSON.stringify(control.text)}`);
-    log(`       id=${control.id || '(none)'} classes=${control.classes.join(' ') || '(none)'}`);
+    log(
+      `       id=${control.id || '(none)'} classes=${control.classes.join(' ') || '(none)'}`,
+    );
     log(
       `       href=${control.href === null ? '(none)' : JSON.stringify(control.href)}` +
         ` target=${control.target === null ? '(none)' : control.target}` +
@@ -245,7 +259,9 @@ export function formatReport(report: DiscoveryReport, log: (line: string) => voi
   section(log, `pagers (${report.pagers.length})`);
   if (report.pagers.length === 0) log('  none');
   for (const pager of report.pagers) {
-    log(`  <${pager.tag}> id=${pager.id || '(none)'} classes=${pager.classes.join(' ') || '(none)'}`);
+    log(
+      `  <${pager.tag}> id=${pager.id || '(none)'} classes=${pager.classes.join(' ') || '(none)'}`,
+    );
     for (const control of pager.controls) {
       log(
         `       ${JSON.stringify(control.text)} classes=${control.classes.join(' ') || '(none)'}` +
@@ -258,7 +274,9 @@ export function formatReport(report: DiscoveryReport, log: (line: string) => voi
   section(log, `tab strips (${report.tabStrips.length})`);
   if (report.tabStrips.length === 0) log('  none');
   for (const strip of report.tabStrips) {
-    log(`  <${strip.tag}> id=${strip.id || '(none)'} classes=${strip.classes.join(' ') || '(none)'}`);
+    log(
+      `  <${strip.tag}> id=${strip.id || '(none)'} classes=${strip.classes.join(' ') || '(none)'}`,
+    );
     for (const item of strip.items) {
       log(`       ${JSON.stringify(item.text)} active=${item.active}`);
     }
@@ -371,7 +389,8 @@ export async function main(argv: string[], deps: DiscoverDeps = {}): Promise<num
       options.useProfile = true;
       options.profileDirectory = args.flags.profile;
     }
-    if (args.flags['user-data-dir'] !== undefined) options.userDataDir = args.flags['user-data-dir'];
+    if (args.flags['user-data-dir'] !== undefined)
+      options.userDataDir = args.flags['user-data-dir'];
     if (args.flags.out !== undefined) options.outPath = args.flags.out;
     if (args.flags.wait !== undefined) options.waitSelector = args.flags.wait;
   } catch (err) {

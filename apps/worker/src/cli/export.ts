@@ -55,10 +55,11 @@ export async function exportRun(
 ): Promise<ExportResult> {
   const log = deps.log ?? ((line: string) => console.log(line)); // eslint-disable-line no-console
   const doFetch = deps.fetch ?? globalThis.fetch;
-  const base = (options.apiBaseUrl ?? process.env.API_BASE_URL ?? DEFAULT_API_BASE_URL).replace(
-    /\/$/,
-    '',
-  );
+  const base = (
+    options.apiBaseUrl ??
+    process.env.API_BASE_URL ??
+    DEFAULT_API_BASE_URL
+  ).replace(/\/$/, '');
   const outDir = isAbsolute(options.outDir)
     ? options.outDir
     : resolve(process.cwd(), options.outDir);

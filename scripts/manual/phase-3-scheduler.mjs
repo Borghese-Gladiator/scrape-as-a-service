@@ -19,7 +19,9 @@ function check(label, actual, expected) {
   if (!ok) failures += 1;
   process.stdout.write(
     `${ok ? 'PASS' : 'FAIL'} ${label}` +
-      (ok ? '\n' : ` (expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)})\n`),
+      (ok
+        ? '\n'
+        : ` (expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)})\n`),
   );
 }
 
@@ -34,20 +36,24 @@ async function load(path) {
 
 function fakeQueue() {
   const added = [];
-  return { added, add: async (name, data, opts) => void added.push({ name, data, opts }) };
+  return {
+    added,
+    add: async (name, data, opts) => void added.push({ name, data, opts }),
+  };
 }
 
 async function main() {
   const databaseUrl = process.argv[2] ?? process.env.DATABASE_URL;
   if (!databaseUrl) {
-    process.stderr.write('usage: node scripts/manual/phase-3-scheduler.mjs <database-url>\n');
+    process.stderr.write(
+      'usage: node scripts/manual/phase-3-scheduler.mjs <database-url>\n',
+    );
     process.exit(2);
   }
 
   const { pollOnce } = await load('../../apps/scheduler/dist/poll.js');
-  const { claimDueSchedule, findStaleAttempts, touchAttempt, withTransaction } = await load(
-    '../../packages/db/dist/index.js',
-  );
+  const { claimDueSchedule, findStaleAttempts, touchAttempt, withTransaction } =
+    await load('../../packages/db/dist/index.js');
 
   const pool = new Pool({ connectionString: databaseUrl });
   let definitionId;
@@ -58,7 +64,10 @@ async function main() {
       [
         'phase-3 scheduler check',
         'https://example.com',
-        JSON.stringify({ fields: [{ name: 'title', selector: 'h1' }], artifacts: ['JSON'] }),
+        JSON.stringify({
+          fields: [{ name: 'title', selector: 'h1' }],
+          artifacts: ['JSON'],
+        }),
       ],
     );
     definitionId = definition.rows[0].id;
@@ -95,7 +104,11 @@ async function main() {
     await pollOnce({ pool, queue: queueA, now: late });
     const skipRow = await readSchedule(skipId);
     check('skip creates one run', await countRuns(skipId), 1);
-    check('skip records last_run_at at now', skipRow.last_run_at.toISOString(), late.toISOString());
+    check(
+      'skip records last_run_at at now',
+      skipRow.last_run_at.toISOString(),
+      late.toISOString(),
+    );
     check(
       'skip resumes the cadence after now',
       skipRow.next_run_at.toISOString(),
@@ -191,9 +204,10 @@ async function main() {
       false,
     );
 
-    await pool.query(`UPDATE scrape_run_attempts SET status = 'SUCCEEDED' WHERE id = $1`, [
-      attemptId,
-    ]);
+    await pool.query(
+      `UPDATE scrape_run_attempts SET status = 'SUCCEEDED' WHERE id = $1`,
+      [attemptId],
+    );
     const finished = await findStaleAttempts(pool, inAnHour);
     check(
       'a finished attempt is never stale',
@@ -208,9 +222,13 @@ async function main() {
         ORDER BY started_at ASC`,
       [tenMinutesAgo],
     );
-    process.stdout.write(`INFO stale query plan: ${plan.rows.map((r) => r['QUERY PLAN']).join(' | ')}\n`);
+    process.stdout.write(
+      `INFO stale query plan: ${plan.rows.map((r) => r['QUERY PLAN']).join(' | ')}\n`,
+    );
 
-    process.stdout.write(failures === 0 ? '\nALL PASS\n' : `\n${failures} CHECK(S) FAILED\n`);
+    process.stdout.write(
+      failures === 0 ? '\nALL PASS\n' : `\n${failures} CHECK(S) FAILED\n`,
+    );
     return failures === 0 ? 0 : 1;
   } finally {
     if (definitionId) {

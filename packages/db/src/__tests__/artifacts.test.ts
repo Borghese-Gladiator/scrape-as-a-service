@@ -23,7 +23,13 @@ function fakeDb(sizeBytes: string): Queryable {
           created_at: new Date('2026-01-01T00:00:00Z'),
         },
       ];
-      return { rows: rows as R[], command: '', rowCount: rows.length, oid: 0, fields: [] };
+      return {
+        rows: rows as R[],
+        command: '',
+        rowCount: rows.length,
+        oid: 0,
+        fields: [],
+      };
     },
   };
 }
@@ -38,7 +44,8 @@ describe('size_bytes', () => {
   it.each([
     {
       desc: 'insertArtifact',
-      read: (db: Queryable) => insertArtifact(db, 'run-1', 'PNG', put, 'receipt-0.png', 3),
+      read: (db: Queryable) =>
+        insertArtifact(db, 'run-1', 'PNG', put, 'receipt-0.png', 3),
     },
     {
       desc: 'listArtifacts',

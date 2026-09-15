@@ -27,7 +27,9 @@ describe('assertSafeUrl schemes', () => {
   });
 
   it('rejects an unparsable URL', async () => {
-    await expect(assertSafeUrl('not a url', PUBLIC)).rejects.toBeInstanceOf(UrlNotAllowedError);
+    await expect(assertSafeUrl('not a url', PUBLIC)).rejects.toBeInstanceOf(
+      UrlNotAllowedError,
+    );
   });
 });
 
@@ -67,7 +69,11 @@ describe('assertSafeUrl addresses', () => {
 
   it.each([
     { desc: 'localhost', host: 'localhost', address: '127.0.0.1' },
-    { desc: 'a name that resolves to a private address', host: 'inside.corp', address: '10.0.0.5' },
+    {
+      desc: 'a name that resolves to a private address',
+      host: 'inside.corp',
+      address: '10.0.0.5',
+    },
     { desc: 'a rebinding name', host: 'evil.test', address: '169.254.169.254' },
     { desc: 'a name that resolves to IPv6 loopback', host: 'db.local', address: '::1' },
   ])('rejects $desc after resolution', async ({ host, address }) => {
@@ -103,9 +109,9 @@ describe('the bypass flag', () => {
   });
 
   it('still rejects a non-HTTP scheme when allowPrivate is set', async () => {
-    await expect(assertSafeUrl('file:///etc/passwd', { allowPrivate: true })).rejects.toBeInstanceOf(
-      UrlNotAllowedError,
-    );
+    await expect(
+      assertSafeUrl('file:///etc/passwd', { allowPrivate: true }),
+    ).rejects.toBeInstanceOf(UrlNotAllowedError);
   });
 });
 

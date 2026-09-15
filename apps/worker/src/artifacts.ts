@@ -91,7 +91,9 @@ interface BuiltDiagnosticArtifact {
   contentType: string;
 }
 
-function buildDiagnosticArtifacts(diagnostics: ScrapeDiagnostics): BuiltDiagnosticArtifact[] {
+function buildDiagnosticArtifacts(
+  diagnostics: ScrapeDiagnostics,
+): BuiltDiagnosticArtifact[] {
   const built: BuiltDiagnosticArtifact[] = [];
   if (diagnostics.screenshot) {
     built.push({

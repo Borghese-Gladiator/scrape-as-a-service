@@ -71,7 +71,12 @@
                   { "name": "paymentType", "selector": "td:nth-child(4)" }
                 ]
               },
-              { "op": "click", "selector": "a.k-button", "opens": "newTab", "timeoutMs": 20000 },
+              {
+                "op": "click",
+                "selector": "a.k-button",
+                "opens": "newTab",
+                "timeoutMs": 20000
+              },
               {
                 "op": "capture",
                 "as": ["PNG", "PDF"],

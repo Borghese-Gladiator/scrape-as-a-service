@@ -20,9 +20,10 @@ export function resolveLimit(limit: number | undefined): number {
 }
 
 export function encodeCursor(row: Keyed): string {
-  return Buffer.from(`${new Date(row.created_at).toISOString()}|${row.id}`, 'utf8').toString(
-    'base64url',
-  );
+  return Buffer.from(
+    `${new Date(row.created_at).toISOString()}|${row.id}`,
+    'utf8',
+  ).toString('base64url');
 }
 
 /** Return null for an unreadable cursor, so a stale link degrades to page one. */
@@ -41,7 +42,10 @@ export function decodeCursor(cursor: string | undefined): Cursor | null {
  * Take one row more than the caller asked for. The extra row proves another
  * page exists without a second count query.
  */
-export function toPage<T extends Keyed>(rows: T[], limit: number): { items: T[]; nextCursor: string | null } {
+export function toPage<T extends Keyed>(
+  rows: T[],
+  limit: number,
+): { items: T[]; nextCursor: string | null } {
   if (rows.length <= limit) return { items: rows, nextCursor: null };
   const items = rows.slice(0, limit);
   const last = items[items.length - 1];

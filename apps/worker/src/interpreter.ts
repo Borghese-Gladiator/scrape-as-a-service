@@ -108,7 +108,9 @@ function currentPage(state: ExecState): Page {
 }
 
 function resolve(state: ExecState, frame: Frame, selector: string): Locator {
-  return frame.scope ? frame.scope.locator(selector) : currentPage(state).locator(selector);
+  return frame.scope
+    ? frame.scope.locator(selector)
+    : currentPage(state).locator(selector);
 }
 
 function countPage(state: ExecState): void {
@@ -179,14 +181,22 @@ async function pageSignature(
  * Check the target before the navigation, and the landing URL after it. The
  * second check matters because a redirect can end on a different host.
  */
-async function navigate(state: ExecState, page: Page, url: string, waitUntil: WaitUntil): Promise<void> {
+async function navigate(
+  state: ExecState,
+  page: Page,
+  url: string,
+  waitUntil: WaitUntil,
+): Promise<void> {
   await state.assertUrl(url);
   await page.goto(url, { waitUntil });
   const landed = page.url();
   if (landed !== url) await state.assertUrl(landed);
 }
 
-async function runGoto(state: ExecState, step: Extract<Step, { op: 'goto' }>): Promise<void> {
+async function runGoto(
+  state: ExecState,
+  step: Extract<Step, { op: 'goto' }>,
+): Promise<void> {
   countPage(state);
   await navigate(
     state,
@@ -283,7 +293,9 @@ async function runExtract(
       rows.push(await readFields(locator.nth(i), step.fields));
     }
   } else {
-    rows.push(await readFields(frame.scope ?? currentPage(state).locator('body'), step.fields));
+    rows.push(
+      await readFields(frame.scope ?? currentPage(state).locator('body'), step.fields),
+    );
   }
 
   state.datasets[step.name] = (state.datasets[step.name] ?? []).concat(rows);

@@ -22,7 +22,11 @@ interface ScheduleRow extends QueryResultRow {
  * transaction is invisible to every other claim until that transaction ends.
  */
 class FakeDb implements Connectable {
-  runsCreated: Array<{ definitionId: string; scheduleId: string | null; trigger: string }> = [];
+  runsCreated: Array<{
+    definitionId: string;
+    scheduleId: string | null;
+    trigger: string;
+  }> = [];
   advanced: Array<{ id: string; lastRunAt: Date; nextRunAt: Date }> = [];
   private readonly locked = new Set<string>();
   private seq = 0;
@@ -65,7 +69,11 @@ class FakeDb implements Connectable {
     }
     if (text.includes('INSERT INTO scrape_runs')) {
       this.seq += 1;
-      const [definitionId, scheduleId, trigger] = values as [string, string | null, string];
+      const [definitionId, scheduleId, trigger] = values as [
+        string,
+        string | null,
+        string,
+      ];
       this.runsCreated.push({ definitionId, scheduleId, trigger });
       return [{ id: `run-${this.seq}`, definition_id: definitionId }];
     }

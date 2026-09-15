@@ -74,7 +74,8 @@ export interface DiscoveryReport {
  */
 export function collectDiscovery(): DiscoveryReport {
   const GRID_SELECTOR = 'table, .k-grid, [role="grid"]';
-  const PAGER_SELECTOR = '.k-pager-wrap, .k-pager, .pager, .pagination, [role="navigation"]';
+  const PAGER_SELECTOR =
+    '.k-pager-wrap, .k-pager, .pager, .pagination, [role="navigation"]';
   const TAB_SELECTOR = '.k-tabstrip, [role="tablist"], ul.nav-tabs, .nav-tabs';
   const CONTROL_SELECTOR = 'a, button, input[type="button"], input[type="submit"]';
   const DATE_HINT = /date|from|to|start|end|begin|until/i;
@@ -128,7 +129,9 @@ export function collectDiscovery(): DiscoveryReport {
    */
   function outermost(selector: string): Element[] {
     const all = Array.from(document.querySelectorAll(selector));
-    return all.filter((element) => !all.some((other) => other !== element && other.contains(element)));
+    return all.filter(
+      (element) => !all.some((other) => other !== element && other.contains(element)),
+    );
   }
 
   const grids: DiscoveredGrid[] = [];
@@ -167,37 +170,33 @@ export function collectDiscovery(): DiscoveryReport {
     }
   }
 
-  const pagers: DiscoveredPager[] = outermost(PAGER_SELECTOR).map(
-    (pager) => ({
-      tag: pager.tagName.toLowerCase(),
-      id: pager.id,
-      classes: classesOf(pager),
-      controls: Array.from(pager.querySelectorAll(CONTROL_SELECTOR)).map((control) => ({
-        tag: control.tagName.toLowerCase(),
-        text: textOf(control),
-        id: control.id,
-        classes: classesOf(control),
-        title: control.getAttribute('title'),
-        ariaLabel: control.getAttribute('aria-label'),
-        disabled: looksDisabled(control),
-      })),
-    }),
-  );
+  const pagers: DiscoveredPager[] = outermost(PAGER_SELECTOR).map((pager) => ({
+    tag: pager.tagName.toLowerCase(),
+    id: pager.id,
+    classes: classesOf(pager),
+    controls: Array.from(pager.querySelectorAll(CONTROL_SELECTOR)).map((control) => ({
+      tag: control.tagName.toLowerCase(),
+      text: textOf(control),
+      id: control.id,
+      classes: classesOf(control),
+      title: control.getAttribute('title'),
+      ariaLabel: control.getAttribute('aria-label'),
+      disabled: looksDisabled(control),
+    })),
+  }));
 
-  const tabStrips: DiscoveredTabStrip[] = outermost(TAB_SELECTOR).map(
-    (strip) => ({
-      tag: strip.tagName.toLowerCase(),
-      id: strip.id,
-      classes: classesOf(strip),
-      items: Array.from(strip.querySelectorAll('li, [role="tab"]')).map((item) => ({
-        text: textOf(item),
-        classes: classesOf(item),
-        active:
-          (item.getAttribute('class') ?? '').indexOf('active') !== -1 ||
-          item.getAttribute('aria-selected') === 'true',
-      })),
-    }),
-  );
+  const tabStrips: DiscoveredTabStrip[] = outermost(TAB_SELECTOR).map((strip) => ({
+    tag: strip.tagName.toLowerCase(),
+    id: strip.id,
+    classes: classesOf(strip),
+    items: Array.from(strip.querySelectorAll('li, [role="tab"]')).map((item) => ({
+      text: textOf(item),
+      classes: classesOf(item),
+      active:
+        (item.getAttribute('class') ?? '').indexOf('active') !== -1 ||
+        item.getAttribute('aria-selected') === 'true',
+    })),
+  }));
 
   const dateInputs: DiscoveredDateInput[] = Array.from(document.querySelectorAll('input'))
     .filter((input) => {

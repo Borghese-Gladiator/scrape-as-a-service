@@ -20,6 +20,10 @@ export function createLogger(name: string, env: NodeJS.ProcessEnv = process.env)
   }
   return pino(
     options,
-    prettyStream({ colorize: true, translateTime: 'SYS:standard', ignore: 'pid,hostname' }),
+    prettyStream({
+      colorize: true,
+      translateTime: 'SYS:standard',
+      ignore: 'pid,hostname',
+    }),
   );
 }

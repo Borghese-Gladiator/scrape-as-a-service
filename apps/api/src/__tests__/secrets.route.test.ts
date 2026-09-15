@@ -62,14 +62,22 @@ function fakePool(stored: { ciphertext?: string }): Pool {
           },
         ];
       }
-      return { rows: rows as R[], command: '', rowCount: rows.length, oid: 0, fields: [] };
+      return {
+        rows: rows as R[],
+        command: '',
+        rowCount: rows.length,
+        oid: 0,
+        fields: [],
+      };
     },
   } as unknown as Pool;
 }
 
 function app(stored: { ciphertext?: string } = {}) {
   const queue = { add: vi.fn(async () => ({})) } as unknown as Queue<ScrapeJobData>;
-  return createServer(fakePool(stored), queue, {} as never, { assertUrl: async () => {} });
+  return createServer(fakePool(stored), queue, {} as never, {
+    assertUrl: async () => {},
+  });
 }
 
 describe('POST /secrets', () => {

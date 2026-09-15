@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { upgradeScrapeConfig, validateScrapeConfig, type ArtifactType } from '../scrape-config.js';
+import {
+  upgradeScrapeConfig,
+  validateScrapeConfig,
+  type ArtifactType,
+} from '../scrape-config.js';
 
 const FIELDS = [
   { name: 'title', selector: 'td.title' },
@@ -13,7 +17,12 @@ function v1(artifacts: ArtifactType[], extra: Record<string, unknown> = {}): unk
 describe('upgradeScrapeConfig', () => {
   it('maps the full v1 shape onto a step program', () => {
     expect(
-      upgradeScrapeConfig(v1(['JSON', 'CSV', 'PNG', 'HTML'], { waitFor: '#ready', rowSelector: 'table tr' })),
+      upgradeScrapeConfig(
+        v1(['JSON', 'CSV', 'PNG', 'HTML'], {
+          waitFor: '#ready',
+          rowSelector: 'table tr',
+        }),
+      ),
     ).toEqual({
       version: 2,
       upgradedFrom: 1,
@@ -41,10 +50,22 @@ describe('upgradeScrapeConfig', () => {
   });
 
   it.each([
-    { type: 'JSON' as const, expected: { emit: ['JSON'], captures: [], record: undefined } },
-    { type: 'CSV' as const, expected: { emit: ['CSV'], captures: [], record: undefined } },
-    { type: 'PNG' as const, expected: { emit: ['JSON'], captures: ['PNG'], record: undefined } },
-    { type: 'HTML' as const, expected: { emit: ['JSON'], captures: ['HTML'], record: undefined } },
+    {
+      type: 'JSON' as const,
+      expected: { emit: ['JSON'], captures: [], record: undefined },
+    },
+    {
+      type: 'CSV' as const,
+      expected: { emit: ['CSV'], captures: [], record: undefined },
+    },
+    {
+      type: 'PNG' as const,
+      expected: { emit: ['JSON'], captures: ['PNG'], record: undefined },
+    },
+    {
+      type: 'HTML' as const,
+      expected: { emit: ['JSON'], captures: ['HTML'], record: undefined },
+    },
     { type: 'WEBM' as const, expected: { emit: ['JSON'], captures: [], record: true } },
   ])('maps the v1 artifact type $type', ({ type, expected }) => {
     const config = upgradeScrapeConfig(v1([type]));
@@ -56,14 +77,19 @@ describe('upgradeScrapeConfig', () => {
   });
 
   it('rejects a v2 input', () => {
-    expect(() => upgradeScrapeConfig({ version: 2, steps: [{ op: 'goBack' }] })).toThrow();
+    expect(() =>
+      upgradeScrapeConfig({ version: 2, steps: [{ op: 'goBack' }] }),
+    ).toThrow();
   });
 
   it.each([
     { desc: 'empty fields', input: { fields: [], artifacts: ['JSON'] } },
     { desc: 'an unknown artifact type', input: { fields: FIELDS, artifacts: ['EXE'] } },
     { desc: 'PDF, which v1 never had', input: { fields: FIELDS, artifacts: ['PDF'] } },
-    { desc: 'a field without a selector', input: { fields: [{ name: 'a' }], artifacts: [] } },
+    {
+      desc: 'a field without a selector',
+      input: { fields: [{ name: 'a' }], artifacts: [] },
+    },
   ])('rejects $desc', ({ input }) => {
     expect(() => upgradeScrapeConfig(input)).toThrow();
   });

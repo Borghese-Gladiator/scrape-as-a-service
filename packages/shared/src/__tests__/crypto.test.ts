@@ -13,7 +13,10 @@ const OTHER_KEY = randomBytes(32);
 describe('encryptSecret and decryptSecret', () => {
   it.each([
     { desc: 'a password', plaintext: 'hunter2' },
-    { desc: 'a storageState blob', plaintext: JSON.stringify({ cookies: [], origins: [] }) },
+    {
+      desc: 'a storageState blob',
+      plaintext: JSON.stringify({ cookies: [], origins: [] }),
+    },
     { desc: 'unicode', plaintext: 'pässwörd — 秘密' },
     { desc: 'a long value', plaintext: 'x'.repeat(20_000) },
   ])('round trips $desc', ({ plaintext }) => {
@@ -51,7 +54,10 @@ describe('encryptSecret and decryptSecret', () => {
 
   it.each([
     { desc: 'too few parts', payload: 'v1.aaa.bbb' },
-    { desc: 'a wrong version', payload: `v2.${encryptSecret('x', KEY).split('.').slice(1).join('.')}` },
+    {
+      desc: 'a wrong version',
+      payload: `v2.${encryptSecret('x', KEY).split('.').slice(1).join('.')}`,
+    },
     { desc: 'a short IV', payload: 'v1.YWJj.YWJjZGVmZ2hpamtsbW5vcA==.YWJj' },
   ])('rejects a malformed payload: $desc', ({ payload }) => {
     expect(() => decryptSecret(payload, KEY)).toThrow(SecretCryptoError);
@@ -69,7 +75,10 @@ describe('loadEncryptionKey', () => {
   it.each([
     { desc: 'unset', env: {} },
     { desc: 'empty', env: { SECRET_ENCRYPTION_KEY: '' } },
-    { desc: 'too short', env: { SECRET_ENCRYPTION_KEY: randomBytes(16).toString('base64') } },
+    {
+      desc: 'too short',
+      env: { SECRET_ENCRYPTION_KEY: randomBytes(16).toString('base64') },
+    },
     { desc: 'too long', env: { SECRET_ENCRYPTION_KEY: randomBytes(48).toString('hex') } },
   ])('rejects a key that is $desc', ({ env }) => {
     expect(() => loadEncryptionKey(env)).toThrow(SecretCryptoError);

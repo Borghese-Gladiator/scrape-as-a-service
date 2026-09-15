@@ -73,7 +73,10 @@ function readDefinitionFile(raw: string, path: string): DefinitionFile {
   try {
     parsed = JSON.parse(raw);
   } catch (err) {
-    throw new CliError('BAD_DEFINITION', `${path} is not valid JSON: ${(err as Error).message}`);
+    throw new CliError(
+      'BAD_DEFINITION',
+      `${path} is not valid JSON: ${(err as Error).message}`,
+    );
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     throw new CliError('BAD_DEFINITION', `${path} must hold a JSON object`);
@@ -105,7 +108,10 @@ export async function runLocal(
   try {
     raw = await readFile(definitionPath, 'utf8');
   } catch (err) {
-    throw new CliError('BAD_DEFINITION', `cannot read ${definitionPath}: ${(err as Error).message}`);
+    throw new CliError(
+      'BAD_DEFINITION',
+      `cannot read ${definitionPath}: ${(err as Error).message}`,
+    );
   }
 
   const file = readDefinitionFile(raw, definitionPath);
@@ -158,7 +164,8 @@ export async function runLocal(
 function errorCode(err: unknown): string {
   if (err instanceof CliError) return err.code;
   if (err instanceof StepError) return err.code;
-  if (err instanceof Error && err.name.length > 0 && err.name !== 'Error') return err.name;
+  if (err instanceof Error && err.name.length > 0 && err.name !== 'Error')
+    return err.name;
   return 'UNKNOWN';
 }
 

@@ -15,7 +15,9 @@ function fakePool(): Pool {
   } as unknown as Pool;
 }
 
-const storage = { presignedGetUrl: vi.fn(async () => 'https://minio.test/object') } as never;
+const storage = {
+  presignedGetUrl: vi.fn(async () => 'https://minio.test/object'),
+} as never;
 
 function app() {
   const queue = { add: vi.fn(async () => ({})) } as unknown as Queue<ScrapeJobData>;
@@ -50,20 +52,29 @@ function call(method: string, path: string) {
 }
 
 describe('the X-API-Key check', () => {
-  it.each(ROUTES)('returns 401 for $method $path with no key', async ({ method, path }) => {
-    const res = await call(method, path).send({});
-    expect(res.status).toBe(401);
-  });
+  it.each(ROUTES)(
+    'returns 401 for $method $path with no key',
+    async ({ method, path }) => {
+      const res = await call(method, path).send({});
+      expect(res.status).toBe(401);
+    },
+  );
 
-  it.each(ROUTES)('returns 401 for $method $path with a wrong key', async ({ method, path }) => {
-    const res = await call(method, path).set('X-API-Key', 'wrong').send({});
-    expect(res.status).toBe(401);
-  });
+  it.each(ROUTES)(
+    'returns 401 for $method $path with a wrong key',
+    async ({ method, path }) => {
+      const res = await call(method, path).set('X-API-Key', 'wrong').send({});
+      expect(res.status).toBe(401);
+    },
+  );
 
-  it.each(ROUTES)('lets $method $path past the check with the right key', async ({ method, path }) => {
-    const res = await call(method, path).set('X-API-Key', API_KEY).send({});
-    expect(res.status).not.toBe(401);
-  });
+  it.each(ROUTES)(
+    'lets $method $path past the check with the right key',
+    async ({ method, path }) => {
+      const res = await call(method, path).set('X-API-Key', API_KEY).send({});
+      expect(res.status).not.toBe(401);
+    },
+  );
 
   it.each([
     { desc: 'no key', headers: {} },

@@ -1,4 +1,4 @@
-import { Queue, type ConnectionOptions, type JobsOptions } from 'bullmq';
+import { Queue, type ConnectionOptions } from 'bullmq';
 import { loadConfig, type AppConfig } from './config.js';
 
 export const SCRAPE_QUEUE_NAME = 'scrape';
@@ -41,7 +41,7 @@ export function getQueue(config: AppConfig = loadConfig()): Queue<ScrapeJobData>
   if (!queueSingleton) {
     queueSingleton = new Queue<ScrapeJobData>(SCRAPE_QUEUE_NAME, {
       connection: getRedisConnection(config),
-      defaultJobOptions: defaultJobOptions() as JobsOptions,
+      defaultJobOptions: defaultJobOptions(),
     });
   }
   return queueSingleton;

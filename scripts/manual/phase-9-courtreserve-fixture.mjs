@@ -34,14 +34,70 @@ const { chromium } = requireFromWorker('playwright');
 const DEFINITION_PATH = join(repoRoot, 'definitions/courtreserve-receipts.json');
 
 const ROWS = [
-  { page: 1, date: '01/12/2024', amount: '$40.00', paid: '01/12/2024', type: 'Card', receipt: '8DX6T13140' },
-  { page: 1, date: '02/19/2024', amount: '$50.00', paid: '02/19/2024', type: 'Card', receipt: '9KL2P13141' },
-  { page: 1, date: '03/04/2024', amount: '$60.00', paid: '03/05/2024', type: 'Cash', receipt: '3QW8R13142' },
-  { page: 2, date: '05/02/2025', amount: '$70.00', paid: '05/02/2025', type: 'Card', receipt: '7ZY4M13143' },
-  { page: 2, date: '06/11/2025', amount: '$80.00', paid: '06/11/2025', type: 'Card', receipt: '1AB5N13144' },
-  { page: 2, date: '07/31/2025', amount: '$90.00', paid: '08/01/2025', type: 'Cash', receipt: '5CD9V13145' },
-  { page: 3, date: '08/14/2026', amount: '$100.00', paid: '08/14/2026', type: 'Card', receipt: '2EF7X13146' },
-  { page: 3, date: '09/01/2026', amount: '$110.00', paid: '09/02/2026', type: 'Cash', receipt: '6GH3Z13147' },
+  {
+    page: 1,
+    date: '01/12/2024',
+    amount: '$40.00',
+    paid: '01/12/2024',
+    type: 'Card',
+    receipt: '8DX6T13140',
+  },
+  {
+    page: 1,
+    date: '02/19/2024',
+    amount: '$50.00',
+    paid: '02/19/2024',
+    type: 'Card',
+    receipt: '9KL2P13141',
+  },
+  {
+    page: 1,
+    date: '03/04/2024',
+    amount: '$60.00',
+    paid: '03/05/2024',
+    type: 'Cash',
+    receipt: '3QW8R13142',
+  },
+  {
+    page: 2,
+    date: '05/02/2025',
+    amount: '$70.00',
+    paid: '05/02/2025',
+    type: 'Card',
+    receipt: '7ZY4M13143',
+  },
+  {
+    page: 2,
+    date: '06/11/2025',
+    amount: '$80.00',
+    paid: '06/11/2025',
+    type: 'Card',
+    receipt: '1AB5N13144',
+  },
+  {
+    page: 2,
+    date: '07/31/2025',
+    amount: '$90.00',
+    paid: '08/01/2025',
+    type: 'Cash',
+    receipt: '5CD9V13145',
+  },
+  {
+    page: 3,
+    date: '08/14/2026',
+    amount: '$100.00',
+    paid: '08/14/2026',
+    type: 'Card',
+    receipt: '2EF7X13146',
+  },
+  {
+    page: 3,
+    date: '09/01/2026',
+    amount: '$110.00',
+    paid: '09/02/2026',
+    type: 'Cash',
+    receipt: '6GH3Z13147',
+  },
 ];
 
 const TOTAL_PAGES = 3;
@@ -78,7 +134,9 @@ function listPage(pageNumber) {
   const prevDisabled = pageNumber === 1 ? ' k-state-disabled' : '';
   const nextDisabled = pageNumber === TOTAL_PAGES ? ' k-state-disabled' : '';
   const nextHref =
-    pageNumber === TOTAL_PAGES ? '' : ` href="/Online/MyBalance/Index/13140?page=${pageNumber + 1}"`;
+    pageNumber === TOTAL_PAGES
+      ? ''
+      : ` href="/Online/MyBalance/Index/13140?page=${pageNumber + 1}"`;
 
   const numbers = Array.from({ length: TOTAL_PAGES }, (_unused, i) => i + 1)
     .map((number) =>
@@ -236,7 +294,10 @@ async function partOneDiscovery(workDir, baseUrl) {
       url: `${baseUrl}/Online/MyBalance/Index/13140?page=1`,
       outPath: join(workDir, 'discovery-report.json'),
     },
-    { launchBrowser: () => chromium.launch({ headless: true }), log: (line) => lines.push(line) },
+    {
+      launchBrowser: () => chromium.launch({ headless: true }),
+      log: (line) => lines.push(line),
+    },
   );
 
   check(report.grids.length === 1, `the report found 1 grid, got ${report.grids.length}`);
@@ -249,7 +310,10 @@ async function partOneDiscovery(workDir, baseUrl) {
       JSON.stringify(['Date', 'Amount', 'Paid Date', 'Payment Type', '']),
     'the report read the five column headers',
   );
-  check(report.grids[0]?.rowCount === 3, `the report counted 3 rows, got ${report.grids[0]?.rowCount}`);
+  check(
+    report.grids[0]?.rowCount === 3,
+    `the report counted 3 rows, got ${report.grids[0]?.rowCount}`,
+  );
   check(
     report.rowControls.length === 1 && report.rowControls[0].text === 'Receipt',
     'the report found the Receipt control in the first row',
@@ -258,7 +322,10 @@ async function partOneDiscovery(workDir, baseUrl) {
     report.rowControls[0]?.href === '/receipt/8DX6T13140',
     `the report read the receipt href, got ${report.rowControls[0]?.href}`,
   );
-  check(report.dateInputs.length === 2, `the report found 2 date inputs, got ${report.dateInputs.length}`);
+  check(
+    report.dateInputs.length === 2,
+    `the report found 2 date inputs, got ${report.dateInputs.length}`,
+  );
   check(
     report.tabStrips.length === 2 &&
       report.tabStrips[1].items.some((item) => item.text === 'Payments' && item.active),
@@ -303,7 +370,9 @@ async function main() {
     const definitionPath = join(workDir, 'phase-9-fixture-definition.json');
     await writeFile(definitionPath, JSON.stringify(fixtureDefinition(shipped)), 'utf8');
 
-    const { runLocal } = await import(join(repoRoot, 'apps/worker/dist/cli/run-local.js'));
+    const { runLocal } = await import(
+      join(repoRoot, 'apps/worker/dist/cli/run-local.js')
+    );
     await runLocal(
       {
         definitionPath,
@@ -339,19 +408,26 @@ async function main() {
     }
 
     const rows = JSON.parse(await readFile(join(outDir, 'receipts.json'), 'utf8'));
-    check(rows.length === ROWS.length, `receipts.json holds ${ROWS.length} rows, got ${rows.length}`);
+    check(
+      rows.length === ROWS.length,
+      `receipts.json holds ${ROWS.length} rows, got ${rows.length}`,
+    );
     check(
       rows.every((row, i) => row.date === ROWS[i].date && row.amount === ROWS[i].amount),
       'receipts.json holds the date and the amount of every row, in page order',
     );
     check(
-      rows.every((row, i) => row.paidDate === ROWS[i].paid && row.paymentType === ROWS[i].type),
+      rows.every(
+        (row, i) => row.paidDate === ROWS[i].paid && row.paymentType === ROWS[i].type,
+      ),
       'receipts.json holds the paid date and the payment type of every row',
     );
 
     const csv = await readFile(join(outDir, 'receipts.csv'), 'utf8');
-    check(csv.split('\n').filter((line) => line.length > 0).length === ROWS.length + 1,
-      'receipts.csv holds one header line and one line per row');
+    check(
+      csv.split('\n').filter((line) => line.length > 0).length === ROWS.length + 1,
+      'receipts.csv holds one header line and one line per row',
+    );
 
     // The pager stopped on its own. A runaway pager would have revisited page 3
     // and produced a duplicate name with a -2 suffix.
@@ -369,7 +445,9 @@ async function main() {
     for (const problem of problems) console.error(`  - ${problem}`);
     process.exit(1);
   }
-  console.log(`\nOK: the shipped definition produced ${expectedCaptureNames().length * 2 + 2} files`);
+  console.log(
+    `\nOK: the shipped definition produced ${expectedCaptureNames().length * 2 + 2} files`,
+  );
 }
 
 await main();

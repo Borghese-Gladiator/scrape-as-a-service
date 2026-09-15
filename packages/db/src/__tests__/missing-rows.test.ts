@@ -15,7 +15,8 @@ describe('repositories on a missing row', () => {
   it.each([
     {
       name: 'updateRunStatus',
-      call: (db: Queryable) => updateRunStatus(db, 'run-does-not-exist', 'RUNNING', new Date()),
+      call: (db: Queryable) =>
+        updateRunStatus(db, 'run-does-not-exist', 'RUNNING', new Date()),
     },
     {
       name: 'setScheduleEnabled',

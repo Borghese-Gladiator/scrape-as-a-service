@@ -22,13 +22,23 @@ const repoRoot = join(here, '..');
 
 const requireFromWorker = createRequire(join(repoRoot, 'apps/worker/package.json'));
 const { chromium } = requireFromWorker('playwright');
-const { runLocal, CliError } = await import(join(repoRoot, 'apps/worker/dist/cli/run-local.js'));
+const { runLocal, CliError } = await import(
+  join(repoRoot, 'apps/worker/dist/cli/run-local.js')
+);
 const { StepError } = await import(join(repoRoot, 'apps/worker/dist/interpreter.js'));
-const { headedChromium } = await import(join(repoRoot, 'apps/worker/dist/cli/chrome-profile.js'));
+const { headedChromium } = await import(
+  join(repoRoot, 'apps/worker/dist/cli/chrome-profile.js')
+);
 
 const DEFAULT_DEFINITION = 'definitions/courtreserve-receipts.json';
 const DEFAULT_CDP = 'http://localhost:9222';
-const CHROME_USER_DATA_DIR = join(homedir(), 'Library', 'Application Support', 'Google', 'Chrome');
+const CHROME_USER_DATA_DIR = join(
+  homedir(),
+  'Library',
+  'Application Support',
+  'Google',
+  'Chrome',
+);
 
 const USAGE = `usage: npm run job:receipts -- --out <folder> [options]
 
@@ -155,7 +165,8 @@ async function main(argv) {
     allowCdp: true,
     allowLocalProfile: true,
   };
-  if (args.flags.timeout !== undefined) options.timeoutMs = Number.parseInt(args.flags.timeout, 10);
+  if (args.flags.timeout !== undefined)
+    options.timeoutMs = Number.parseInt(args.flags.timeout, 10);
 
   try {
     const result = await runLocal(options, {
@@ -177,7 +188,10 @@ async function main(argv) {
 
     if (auth.mode === 'cdp' && (code === 'AUTH_FAILED' || unreachable)) {
       console.error(CDP_HELP);
-    } else if (code === 'SELECTOR_NOT_FOUND' || /Timeout|waiting for locator/i.test(message)) {
+    } else if (
+      code === 'SELECTOR_NOT_FOUND' ||
+      /Timeout|waiting for locator/i.test(message)
+    ) {
       console.error(`
 A selector did not match. Every selector in the definition is an unverified
 Kendo UI default until you confirm it. Run the discovery report against the

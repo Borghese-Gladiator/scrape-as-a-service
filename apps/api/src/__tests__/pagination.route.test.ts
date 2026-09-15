@@ -45,7 +45,10 @@ describe('keyset pagination', () => {
       `/runs?limit=3&cursor=${encodeURIComponent(first.body.nextCursor)}`,
     );
     expect(second.status).toBe(200);
-    expect(second.body.items.map((run: { id: string }) => run.id)).toEqual(['run-1', 'run-0']);
+    expect(second.body.items.map((run: { id: string }) => run.id)).toEqual([
+      'run-1',
+      'run-0',
+    ]);
     expect(second.body.nextCursor).toBeNull();
   });
 
@@ -81,20 +84,29 @@ describe('keyset pagination', () => {
   });
 
   it('filters runs by status', async () => {
-    const res = await request(server(new FakeDb({ runs: runs(5) }))).get('/runs?status=FAILED');
+    const res = await request(server(new FakeDb({ runs: runs(5) }))).get(
+      '/runs?status=FAILED',
+    );
 
     expect(res.status).toBe(200);
-    expect(res.body.items.map((run: { id: string }) => run.id)).toEqual(['run-3', 'run-1']);
+    expect(res.body.items.map((run: { id: string }) => run.id)).toEqual([
+      'run-3',
+      'run-1',
+    ]);
   });
 
   it('rejects an unknown status', async () => {
-    const res = await request(server(new FakeDb({ runs: runs(1) }))).get('/runs?status=CANCELLED');
+    const res = await request(server(new FakeDb({ runs: runs(1) }))).get(
+      '/runs?status=CANCELLED',
+    );
 
     expect(res.status).toBe(400);
   });
 
   it('starts at page one when the cursor is unreadable', async () => {
-    const res = await request(server(new FakeDb({ runs: runs(3) }))).get('/runs?cursor=not-base64');
+    const res = await request(server(new FakeDb({ runs: runs(3) }))).get(
+      '/runs?cursor=not-base64',
+    );
 
     expect(res.status).toBe(200);
     expect(res.body.items).toHaveLength(3);

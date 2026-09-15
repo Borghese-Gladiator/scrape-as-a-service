@@ -79,7 +79,9 @@ export function isStoredStateFresh(raw: string, nowMs: number): boolean {
     return false;
   }
   const cookies = state.cookies ?? [];
-  return cookies.some((cookie) => typeof cookie.expires === 'number' && cookie.expires * 1000 > nowMs);
+  return cookies.some(
+    (cookie) => typeof cookie.expires === 'number' && cookie.expires * 1000 > nowMs,
+  );
 }
 
 function parseStorageState(raw: string, secretRef: string): unknown {
@@ -106,7 +108,12 @@ async function copyChromeProfile(
 
   const target = await mkdtemp(join(tmpdir(), 'scrape-chrome-'));
   const localState = join(userDataDir, 'Local State');
-  if (await stat(localState).then(() => true, () => false)) {
+  if (
+    await stat(localState).then(
+      () => true,
+      () => false,
+    )
+  ) {
     await cp(localState, join(target, 'Local State'));
   }
   await cp(source, join(target, profileDirectory), {
@@ -117,10 +124,7 @@ async function copyChromeProfile(
   return target;
 }
 
-async function cdpSession(
-  endpointUrl: string,
-  deps: AuthDeps,
-): Promise<AuthSession> {
+async function cdpSession(endpointUrl: string, deps: AuthDeps): Promise<AuthSession> {
   if (!deps.allowCdp) {
     throw authFailed('auth.mode=cdp needs ALLOW_CDP=true');
   }
@@ -220,7 +224,10 @@ export async function createAuthSession(
     return cdpSession((auth as Extract<AuthConfig, { mode: 'cdp' }>).endpointUrl, deps);
   }
   if (mode === 'chromeProfile') {
-    return chromeProfileSession(auth as Extract<AuthConfig, { mode: 'chromeProfile' }>, deps);
+    return chromeProfileSession(
+      auth as Extract<AuthConfig, { mode: 'chromeProfile' }>,
+      deps,
+    );
   }
   if (mode === 'login') {
     return loginSession(auth as Extract<AuthConfig, { mode: 'login' }>, deps);

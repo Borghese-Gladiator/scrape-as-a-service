@@ -22,7 +22,10 @@ function parseConfig(input: unknown) {
 
 export type AssertUrl = (url: string) => Promise<void>;
 
-export function definitionsRouter(pool: Pool, assertUrl: AssertUrl = assertSafeUrl): Router {
+export function definitionsRouter(
+  pool: Pool,
+  assertUrl: AssertUrl = assertSafeUrl,
+): Router {
   const router = Router();
 
   async function checkUrl(url: string): Promise<void> {
@@ -110,7 +113,11 @@ export function definitionsRouter(pool: Pool, assertUrl: AssertUrl = assertSafeU
   router.delete(
     '/:id',
     asyncHandler(async (req, res) => {
-      const definition = await softDeleteDefinition(pool, req.params.id ?? '', new Date());
+      const definition = await softDeleteDefinition(
+        pool,
+        req.params.id ?? '',
+        new Date(),
+      );
       if (!definition) {
         throw new HttpError(404, 'definition not found');
       }

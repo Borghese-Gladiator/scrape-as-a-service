@@ -20,6 +20,8 @@ apps/
 
 - Docker + Docker Compose v2 (the only requirement to run the full stack)
 - Node >= 20 (only for local, non-Docker development / running tests)
+- Chromium for Playwright, for a local worker and for the end-to-end test:
+  `npx playwright install chromium`. The Docker images already carry it.
 
 ## Run the whole stack (Docker Compose)
 
@@ -699,6 +701,8 @@ level. Output is pretty-printed unless `NODE_ENV=production`.
 ```bash
 cp .env.example .env
 npm install
+npm run postinstall:browsers   # downloads Chromium; see the prerequisite below
+npm run lint
 npm run typecheck
 npm test
 ```
@@ -710,6 +714,87 @@ docker compose up -d postgres redis minio minio-bootstrap
 npm run migrate
 npm run dev --workspace @scraper/web   # etc.
 ```
+
+### Playwright browsers are a separate download
+
+The worker drives a real Chromium. Docker images get it from the Playwright base
+image, but a local worker and the end-to-end test do not. Install it once:
+
+```bash
+npx playwright install chromium
+# or, the same thing through the workspace script:
+npm run postinstall:browsers
+```
+
+Nothing installs the browser automatically, because the download is about 150 MB.
+Without it the worker and the end-to-end test fail to launch a browser.
+
+## Scripts
+
+| Script | Purpose |
+| --- | --- |
+| `npm run lint` | ESLint over `packages/*`, `apps/api`, `apps/worker`, `apps/scheduler` |
+| `npm run lint:fix` | The same, with autofix |
+| `npm run format` | Prettier over the repository |
+| `npm run format:check` | Prettier in check mode (used by review, not by CI) |
+| `npm run typecheck` | `tsc -b` over every non-web project |
+| `npm test` | The unit suite. Needs no Docker |
+| `npm run test:integration:up` | Start Postgres, Redis, and MinIO for the integration suite |
+| `npm run test:integration` | The integration and end-to-end suites |
+| `npm run test:integration:down` | Stop and remove those services |
+| `npm run postinstall:browsers` | `npx playwright install chromium` |
+
+`apps/web` keeps its own configuration. Lint and typecheck it with
+`npm run lint --workspace @scraper/web` and
+`npm run check-types --workspace @scraper/web`.
+
+## Tests
+
+### Unit suite
+
+```bash
+npm test
+```
+
+It runs `vitest` over every `src/**/__tests__/**/*.test.ts` file, then the
+`apps/web` suite. It uses fakes only, so it needs no Docker and no network.
+
+### Integration and end-to-end suite
+
+The integration suite runs every repository query against a real Postgres, and
+exercises real Redis and real MinIO. The end-to-end test creates a definition
+over HTTP, triggers a run, drives a real Chromium against a fixture site served
+by the test, and downloads the artifacts.
+
+```bash
+npm run test:integration:up     # postgres :55432, redis :56379, minio :59000
+npm run test:integration
+npm run test:integration:down
+```
+
+`docker-compose.test.yml` publishes the three services on non-default host
+ports and keeps their state in `tmpfs`, so it runs beside your own
+`docker compose up` without a clash and leaves nothing behind.
+
+When the services are not reachable the suite prints the reason and skips every
+test, so the command stays usable offline. Set `INTEGRATION_REQUIRED=1` to make
+an unreachable service a failure instead; CI sets it.
+
+Override any endpoint with `TEST_DATABASE_URL`, `TEST_REDIS_URL`,
+`TEST_MINIO_ENDPOINT`, `TEST_MINIO_PORT`, `TEST_MINIO_ACCESS_KEY`,
+`TEST_MINIO_SECRET_KEY`, or `TEST_MINIO_BUCKET`.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every push and every pull request:
+
+1. `lint-typecheck-unit`: `npm ci`, `npm run lint`, `npm run typecheck`,
+   `npm run check-types --workspace @scraper/web`, `npm test`.
+2. `integration`: the same install, then `npx playwright install --with-deps
+   chromium`, then `npm run test:integration` against Postgres, Redis, and MinIO
+   service containers.
+
+Only the second job downloads a browser.
 
 ## Migrations
 

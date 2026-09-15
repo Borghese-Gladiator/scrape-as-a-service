@@ -1,6 +1,13 @@
 import type { Queryable } from '../client.js';
 import { decodeCursor, resolveLimit, toPage } from '../pagination.js';
-import type { Page, PageQuery, RunDetail, RunStatus, RunTrigger, ScrapeRun } from '../types.js';
+import type {
+  Page,
+  PageQuery,
+  RunDetail,
+  RunStatus,
+  RunTrigger,
+  ScrapeRun,
+} from '../types.js';
 import { listAttempts } from './attempts.js';
 import { listArtifacts } from './artifacts.js';
 
@@ -52,10 +59,7 @@ export async function getRun(db: Queryable, id: string): Promise<ScrapeRun | nul
   return rows[0] ?? null;
 }
 
-export async function getRunDetail(
-  db: Queryable,
-  id: string,
-): Promise<RunDetail | null> {
+export async function getRunDetail(db: Queryable, id: string): Promise<RunDetail | null> {
   const run = await getRun(db, id);
   if (!run) return null;
   const [attempts, artifacts] = await Promise.all([

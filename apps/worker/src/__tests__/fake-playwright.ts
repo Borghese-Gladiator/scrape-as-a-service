@@ -83,7 +83,9 @@ class FakeLocator {
 
   async waitFor(options: { state?: string; timeout?: number } = {}): Promise<void> {
     if (this.matches().length === 0) {
-      throw new Error(`waitFor: no element matched (state ${options.state ?? 'visible'})`);
+      throw new Error(
+        `waitFor: no element matched (state ${options.state ?? 'visible'})`,
+      );
     }
     this.page.log.push(`waitFor:${options.state ?? 'visible'}`);
   }

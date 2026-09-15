@@ -3,8 +3,17 @@ import type { Job } from 'bullmq';
 import type { Page } from 'playwright';
 import type { QueryResult, QueryResultRow } from 'pg';
 import type { Queryable } from '@scraper/db';
-import type { ScrapeConfig, ScrapeJobData, StorageClient, StoragePutResult } from '@scraper/shared';
-import { attachDiagnostics, getDiagnostics, type DiagnosticError } from '../diagnostics.js';
+import type {
+  ScrapeConfig,
+  ScrapeJobData,
+  StorageClient,
+  StoragePutResult,
+} from '@scraper/shared';
+import {
+  attachDiagnostics,
+  getDiagnostics,
+  type DiagnosticError,
+} from '../diagnostics.js';
 
 const runScrapeMock = vi.fn();
 vi.mock('../scrape.js', () => ({
@@ -53,7 +62,11 @@ function fakeStorage(): StorageClient {
   return {
     ensureBucket: vi.fn(async () => {}),
     put: vi.fn(
-      async (objectKey: string, body: Buffer, contentType: string): Promise<StoragePutResult> => ({
+      async (
+        objectKey: string,
+        body: Buffer,
+        contentType: string,
+      ): Promise<StoragePutResult> => ({
         objectKey,
         contentType,
         sizeBytes: body.length,

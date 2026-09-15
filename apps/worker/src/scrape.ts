@@ -48,10 +48,15 @@ export async function openScrapeSession(
     contextOptions,
     runLogin: async (context) => {
       if (config.auth?.mode !== 'login') return;
-      await runProgram(context, url, { version: 2, steps: config.auth.steps }, {
-        secrets: deps.secrets,
-        now: deps.now,
-      });
+      await runProgram(
+        context,
+        url,
+        { version: 2, steps: config.auth.steps },
+        {
+          secrets: deps.secrets,
+          now: deps.now,
+        },
+      );
     },
     ...(deps.saveSecret ? { saveSecret: deps.saveSecret } : {}),
     ...(deps.now ? { now: deps.now } : {}),

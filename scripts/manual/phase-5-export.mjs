@@ -108,7 +108,11 @@ async function partOneLocalRunner(workDir, baseUrl) {
   const outDir = join(workDir, 'local-out');
   await writeFile(
     definitionPath,
-    JSON.stringify({ name: 'Fixture receipts', url: `${baseUrl}/list?page=1`, config: CONFIG }),
+    JSON.stringify({
+      name: 'Fixture receipts',
+      url: `${baseUrl}/list?page=1`,
+      config: CONFIG,
+    }),
     'utf8',
   );
 
@@ -125,7 +129,12 @@ async function partOneLocalRunner(workDir, baseUrl) {
   check(code === 0, `the local runner exited with ${code}`);
 
   const onDisk = (await readdir(outDir)).sort();
-  const expected = [...expectedCaptureNames(), 'row.json', 'rows.csv', 'rows.json'].sort();
+  const expected = [
+    ...expectedCaptureNames(),
+    'row.json',
+    'rows.csv',
+    'rows.json',
+  ].sort();
   check(
     onDisk.length === expected.length,
     `expected ${expected.length} files on disk, found ${onDisk.length}`,
@@ -223,7 +232,9 @@ async function partTwoZipExport(workDir, localOutDir) {
       await storage.remove(key).catch(() => {});
     }
     if (created.runId) {
-      await pool.query('DELETE FROM scrape_runs WHERE id = $1', [created.runId]).catch(() => {});
+      await pool
+        .query('DELETE FROM scrape_runs WHERE id = $1', [created.runId])
+        .catch(() => {});
     }
     if (created.definitionId) {
       await pool

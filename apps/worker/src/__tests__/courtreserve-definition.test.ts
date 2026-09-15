@@ -49,7 +49,9 @@ describe.each([
 
   it('clicks the Payments sub-tab before it reads the table', () => {
     const steps = flatten(stepsOf(file));
-    const tab = steps.find((step) => step.op === 'click' && /Payments/.test(step.selector));
+    const tab = steps.find(
+      (step) => step.op === 'click' && /Payments/.test(step.selector),
+    );
 
     expect(tab).toBeDefined();
     // The tab selector is an unverified default, so a miss must not fail the run.
@@ -74,19 +76,15 @@ describe.each([
 
     expect(paginate).toBeDefined();
     expect(forEach).toBeDefined();
-    expect((extract as Extract<Step, { op: 'extract' }>).fields.map((f) => f.name)).toEqual([
-      'date',
-      'amount',
-      'paidDate',
-      'paymentType',
-    ]);
+    expect(
+      (extract as Extract<Step, { op: 'extract' }>).fields.map((f) => f.name),
+    ).toEqual(['date', 'amount', 'paidDate', 'paymentType']);
   });
 
   it('captures each receipt as PNG and PDF under a templated name', () => {
-    const capture = flatten(stepsOf(file)).find((step) => step.op === 'capture') as Extract<
-      Step,
-      { op: 'capture' }
-    >;
+    const capture = flatten(stepsOf(file)).find(
+      (step) => step.op === 'capture',
+    ) as Extract<Step, { op: 'capture' }>;
 
     expect(capture.as).toEqual(['PNG', 'PDF']);
     expect(capture.name).toBe('receipt-{{page}}-{{index}}-{{row.date}}');
@@ -102,9 +100,9 @@ describe('the two receipt shapes', () => {
     expect(openLink.some((step) => step.op === 'goBack')).toBe(false);
 
     expect(newTab.some((step) => step.op === 'openLink')).toBe(false);
-    expect(
-      newTab.some((step) => step.op === 'click' && step.opens === 'newTab'),
-    ).toBe(true);
+    expect(newTab.some((step) => step.op === 'click' && step.opens === 'newTab')).toBe(
+      true,
+    );
     expect(newTab.some((step) => step.op === 'goBack')).toBe(true);
   });
 

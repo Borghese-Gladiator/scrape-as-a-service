@@ -106,7 +106,11 @@ const CONFIG = {
               op: 'openLink',
               selector: 'a.receipt',
               steps: [
-                { op: 'capture', as: ['PNG'], name: 'receipt-p{{page}}-r{{index}}-{{row.receipt}}' },
+                {
+                  op: 'capture',
+                  as: ['PNG'],
+                  name: 'receipt-p{{page}}-r{{index}}-{{row.receipt}}',
+                },
               ],
             },
           ],
@@ -140,7 +144,10 @@ describe('runLocal', () => {
 
     const result = await runLocal(
       { definitionPath, outDir, allowPrivateUrls: true },
-      { launchBrowser: async () => fakeBrowser(fixtureSite()), log: (line) => lines.push(line) },
+      {
+        launchBrowser: async () => fakeBrowser(fixtureSite()),
+        log: (line) => lines.push(line),
+      },
     );
 
     const expected = [
@@ -191,7 +198,11 @@ describe('runLocal', () => {
       { launchBrowser: async () => fakeBrowser(fixtureSite()), log: () => {} },
     );
 
-    expect((await readdir(outDir)).sort()).toEqual(['data.csv', 'data.json', 'screenshot.png']);
+    expect((await readdir(outDir)).sort()).toEqual([
+      'data.csv',
+      'data.json',
+      'screenshot.png',
+    ]);
   });
 });
 
@@ -236,10 +247,13 @@ describe('run-local main', () => {
   ])('returns 1 for $desc', async ({ build }) => {
     const definitionPath = await build();
 
-    const code = await main(['--definition', definitionPath, '--out', join(workDir, 'out')], {
-      launchBrowser: async () => fakeBrowser(fixtureSite()),
-      log: () => {},
-    });
+    const code = await main(
+      ['--definition', definitionPath, '--out', join(workDir, 'out')],
+      {
+        launchBrowser: async () => fakeBrowser(fixtureSite()),
+        log: () => {},
+      },
+    );
 
     expect(code).toBe(1);
   });
@@ -253,10 +267,13 @@ describe('run-local main', () => {
       },
     });
 
-    const code = await main(['--definition', definitionPath, '--out', join(workDir, 'out')], {
-      launchBrowser: async () => fakeBrowser(fixtureSite()),
-      log: () => {},
-    });
+    const code = await main(
+      ['--definition', definitionPath, '--out', join(workDir, 'out')],
+      {
+        launchBrowser: async () => fakeBrowser(fixtureSite()),
+        log: () => {},
+      },
+    );
 
     expect(code).toBe(1);
   });

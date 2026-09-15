@@ -48,11 +48,17 @@ describe('PUT /definitions/:id', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Renamed');
-    expect(fake.definitions[0]!.config).toEqual({ version: 2, steps: [{ op: 'goBack' }] });
+    expect(fake.definitions[0]!.config).toEqual({
+      version: 2,
+      steps: [{ op: 'goBack' }],
+    });
   });
 
   it.each([
-    { desc: 'an invalid config', body: { config: { version: 2, steps: [{ op: 'evaluate' }] } } },
+    {
+      desc: 'an invalid config',
+      body: { config: { version: 2, steps: [{ op: 'evaluate' }] } },
+    },
     { desc: 'an empty body', body: {} },
     { desc: 'an empty name', body: { name: '' } },
   ])('rejects $desc', async ({ body }) => {

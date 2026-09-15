@@ -26,7 +26,10 @@ export async function listSecrets(db: Queryable): Promise<SecretMeta[]> {
   return rows;
 }
 
-export async function getSecretCiphertext(db: Queryable, name: string): Promise<string | null> {
+export async function getSecretCiphertext(
+  db: Queryable,
+  name: string,
+): Promise<string | null> {
   const { rows } = await db.query<{ ciphertext: string }>(
     'SELECT ciphertext FROM secrets WHERE name = $1',
     [name],

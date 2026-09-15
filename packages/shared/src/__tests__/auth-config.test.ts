@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { collectSecretRefs, validateScrapeConfig, type ScrapeConfig } from '../scrape-config.js';
+import {
+  collectSecretRefs,
+  validateScrapeConfig,
+  type ScrapeConfig,
+} from '../scrape-config.js';
 
 function withAuth(auth: unknown): unknown {
   return { version: 2, auth, steps: [{ op: 'goto' }] };
@@ -13,7 +17,11 @@ describe('auth validation', () => {
     { desc: 'chromeProfile', auth: { mode: 'chromeProfile', userDataDir: '/u/Chrome' } },
     {
       desc: 'chromeProfile with a named profile',
-      auth: { mode: 'chromeProfile', userDataDir: '/u/Chrome', profileDirectory: 'Profile 1' },
+      auth: {
+        mode: 'chromeProfile',
+        userDataDir: '/u/Chrome',
+        profileDirectory: 'Profile 1',
+      },
     },
     {
       desc: 'login',

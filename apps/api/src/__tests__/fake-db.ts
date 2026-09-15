@@ -95,13 +95,17 @@ export class FakeDb {
       return this.definitions.filter((row) => row.id === values[0]);
     }
     if (text.includes('UPDATE scrape_definitions') && text.includes('deleted_at = $2')) {
-      const row = this.definitions.find((d) => d.id === values[0] && d.deleted_at === null);
+      const row = this.definitions.find(
+        (d) => d.id === values[0] && d.deleted_at === null,
+      );
       if (!row) return [];
       row.deleted_at = values[1] as Date;
       return [row];
     }
     if (text.includes('UPDATE scrape_definitions')) {
-      const row = this.definitions.find((d) => d.id === values[0] && d.deleted_at === null);
+      const row = this.definitions.find(
+        (d) => d.id === values[0] && d.deleted_at === null,
+      );
       if (!row) return [];
       if (values[1] !== null) row.name = values[1] as string;
       if (values[2] !== null) row.url = values[2] as string;
@@ -161,7 +165,10 @@ export class FakeDb {
       this.attempts.push(row);
       return [row];
     }
-    if (text.includes('UPDATE scrape_run_attempts') && text.includes("status = 'RUNNING'")) {
+    if (
+      text.includes('UPDATE scrape_run_attempts') &&
+      text.includes("status = 'RUNNING'")
+    ) {
       const matched = this.attempts.filter(
         (a) => a.run_id === values[0] && a.status === 'RUNNING',
       );
@@ -216,7 +223,7 @@ export class FakeDb {
     const limit = values[values.length - 1] as number;
     let page = [...rows].sort((a, b) => {
       const byTime = b.created_at.getTime() - a.created_at.getTime();
-      return byTime !== 0 ? byTime : (a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
+      return byTime !== 0 ? byTime : a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
     });
     if (text.includes('(created_at, id) <')) {
       const createdAt = values[values.length - 3] as Date;

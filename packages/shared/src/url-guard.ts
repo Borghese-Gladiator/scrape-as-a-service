@@ -56,7 +56,10 @@ const BLOCKED_V6: Cidr6[] = [
 
 function toV4Number(octets: number[]): number {
   return (
-    ((octets[0] ?? 0) << 24) | ((octets[1] ?? 0) << 16) | ((octets[2] ?? 0) << 8) | (octets[3] ?? 0)
+    ((octets[0] ?? 0) << 24) |
+    ((octets[1] ?? 0) << 16) |
+    ((octets[2] ?? 0) << 8) |
+    (octets[3] ?? 0)
   );
 }
 
@@ -160,7 +163,10 @@ async function defaultResolveHost(hostname: string): Promise<string[]> {
  * only, then resolves the host, because a public name can point at a private
  * address. `ALLOW_PRIVATE_URLS=true` turns the address check off.
  */
-export async function assertSafeUrl(url: string, options: UrlGuardOptions = {}): Promise<void> {
+export async function assertSafeUrl(
+  url: string,
+  options: UrlGuardOptions = {},
+): Promise<void> {
   let parsed: URL;
   try {
     parsed = new URL(url);

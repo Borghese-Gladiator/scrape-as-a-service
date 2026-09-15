@@ -33,38 +33,41 @@ describe('POST /runs/:id/cancel', () => {
   it.each([
     { desc: 'a QUEUED run', status: 'QUEUED', attempts: [] as AttemptRow[] },
     { desc: 'a RUNNING run', status: 'RUNNING', attempts: [attempt()] },
-  ])('cancels $desc as FAILED with the error code CANCELLED', async ({ status, attempts }) => {
-    const db = new FakeDb({
-      definitions: [definitionRow()],
-      runs: [runRow({ id: 'run-1', status })],
-      attempts,
-    });
-    const jobQueue = queue();
-    const app = createServer(db.asPool(), jobQueue, storage);
+  ])(
+    'cancels $desc as FAILED with the error code CANCELLED',
+    async ({ status, attempts }) => {
+      const db = new FakeDb({
+        definitions: [definitionRow()],
+        runs: [runRow({ id: 'run-1', status })],
+        attempts,
+      });
+      const jobQueue = queue();
+      const app = createServer(db.asPool(), jobQueue, storage);
 
-    const res = await request(app).post('/runs/run-1/cancel');
+      const res = await request(app).post('/runs/run-1/cancel');
 
-    expect(res.status).toBe(200);
-    expect(res.body.status).toBe('FAILED');
-    expect(jobQueue.remove).toHaveBeenCalledWith('run-1');
-    expect(db.runs[0]!.status).toBe('FAILED');
-    expect(db.attempts).toHaveLength(1);
-    expect(db.attempts[0]).toMatchObject({ status: 'FAILED', error_code: 'CANCELLED' });
-  });
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('FAILED');
+      expect(jobQueue.remove).toHaveBeenCalledWith('run-1');
+      expect(db.runs[0]!.status).toBe('FAILED');
+      expect(db.attempts).toHaveLength(1);
+      expect(db.attempts[0]).toMatchObject({ status: 'FAILED', error_code: 'CANCELLED' });
+    },
+  );
 
-  it.each([
-    { status: 'SUCCEEDED' },
-    { status: 'FAILED' },
-  ])('returns 409 for a run that is already $status', async ({ status }) => {
-    const db = new FakeDb({ runs: [runRow({ id: 'run-1', status })] });
-    const jobQueue = queue();
-    const app = createServer(db.asPool(), jobQueue, storage);
+  it.each([{ status: 'SUCCEEDED' }, { status: 'FAILED' }])(
+    'returns 409 for a run that is already $status',
+    async ({ status }) => {
+      const db = new FakeDb({ runs: [runRow({ id: 'run-1', status })] });
+      const jobQueue = queue();
+      const app = createServer(db.asPool(), jobQueue, storage);
 
-    const res = await request(app).post('/runs/run-1/cancel');
+      const res = await request(app).post('/runs/run-1/cancel');
 
-    expect(res.status).toBe(409);
-    expect(jobQueue.remove).not.toHaveBeenCalled();
-  });
+      expect(res.status).toBe(409);
+      expect(jobQueue.remove).not.toHaveBeenCalled();
+    },
+  );
 
   it('returns 404 for an unknown run', async () => {
     const app = createServer(new FakeDb().asPool(), queue(), storage);
@@ -96,7 +99,9 @@ describe('POST /runs/:id/rerun', () => {
     { desc: 'a deleted definition', runId: 'run-1', deleted: true, status: 409 },
   ])('returns $status for $desc', async ({ runId, deleted, status }) => {
     const db = new FakeDb({
-      definitions: [definitionRow({ id: 'def-1', deleted_at: deleted ? new Date() : null })],
+      definitions: [
+        definitionRow({ id: 'def-1', deleted_at: deleted ? new Date() : null }),
+      ],
       runs: [runRow({ id: 'run-1', definition_id: 'def-1' })],
     });
     const jobQueue = queue();

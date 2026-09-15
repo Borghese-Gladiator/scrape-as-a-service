@@ -14,7 +14,15 @@ function fakePool(): Pool {
     ): Promise<QueryResult<R>> {
       let rows: unknown[] = [];
       if (text.includes('FROM scrape_definitions')) {
-        rows = [{ id: 'def-1', name: 'd', url: 'https://x', config: {}, created_at: new Date() }];
+        rows = [
+          {
+            id: 'def-1',
+            name: 'd',
+            url: 'https://x',
+            config: {},
+            created_at: new Date(),
+          },
+        ];
       } else if (text.includes('INSERT INTO scrape_runs')) {
         rows = [
           {
@@ -29,7 +37,13 @@ function fakePool(): Pool {
           },
         ];
       }
-      return { rows: rows as R[], command: '', rowCount: rows.length, oid: 0, fields: [] };
+      return {
+        rows: rows as R[],
+        command: '',
+        rowCount: rows.length,
+        oid: 0,
+        fields: [],
+      };
     },
   } as unknown as Pool;
 }
@@ -69,7 +83,10 @@ describe('POST /runs (manual trigger)', () => {
   it.each([
     { desc: 'definitionId is missing', body: {} },
     { desc: 'the trigger is unknown', body: { definitionId: 'def-1', trigger: 'CRON' } },
-    { desc: 'the trigger is SCHEDULE', body: { definitionId: 'def-1', trigger: 'SCHEDULE' } },
+    {
+      desc: 'the trigger is SCHEDULE',
+      body: { definitionId: 'def-1', trigger: 'SCHEDULE' },
+    },
   ])('returns 400 when $desc', async ({ body }) => {
     const queue = { add: vi.fn() } as unknown as Queue<ScrapeJobData>;
     const app = createServer(fakePool(), queue, storage);

@@ -175,7 +175,9 @@ describe('formatReport', () => {
 
 describe('authForOptions', () => {
   it('builds a cdp auth from the endpoint', () => {
-    expect(authForOptions({ url: 'https://x.test', cdpEndpoint: 'http://localhost:9222' })).toEqual({
+    expect(
+      authForOptions({ url: 'https://x.test', cdpEndpoint: 'http://localhost:9222' }),
+    ).toEqual({
       mode: 'cdp',
       endpointUrl: 'http://localhost:9222',
     });
@@ -194,7 +196,11 @@ describe('authForOptions', () => {
 
   it('refuses both session modes at once', () => {
     expect(() =>
-      authForOptions({ url: 'https://x.test', cdpEndpoint: 'http://localhost:9222', useProfile: true }),
+      authForOptions({
+        url: 'https://x.test',
+        cdpEndpoint: 'http://localhost:9222',
+        useProfile: true,
+      }),
     ).toThrow(DiscoverError);
   });
 });

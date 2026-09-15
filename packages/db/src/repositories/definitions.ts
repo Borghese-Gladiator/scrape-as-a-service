@@ -30,7 +30,9 @@ export async function listDefinitions(
 ): Promise<Page<ScrapeDefinition>> {
   const limit = resolveLimit(query.limit);
   const cursor = decodeCursor(query.cursor);
-  const values: unknown[] = cursor ? [cursor.createdAt, cursor.id, limit + 1] : [limit + 1];
+  const values: unknown[] = cursor
+    ? [cursor.createdAt, cursor.id, limit + 1]
+    : [limit + 1];
   const after = cursor ? 'AND (created_at, id) < ($1, $2)' : '';
   const { rows } = await db.query<ScrapeDefinition>(
     `SELECT ${COLUMNS} FROM scrape_definitions

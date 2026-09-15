@@ -43,7 +43,10 @@ export function schedulesRouter(pool: Pool): Router {
       const enabled = body?.enabled === undefined ? true : Boolean(body.enabled);
       const catchUp = body?.catchUp ?? 'skip';
       if (!isCatchUpPolicy(catchUp)) {
-        throw new HttpError(400, `catchUp must be one of: ${CATCH_UP_POLICIES.join(', ')}`);
+        throw new HttpError(
+          400,
+          `catchUp must be one of: ${CATCH_UP_POLICIES.join(', ')}`,
+        );
       }
 
       const definition = await getDefinition(pool, definitionId);

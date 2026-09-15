@@ -46,7 +46,10 @@ async function main() {
       [
         'phase-3 stale check',
         'https://example.com',
-        JSON.stringify({ fields: [{ name: 'title', selector: 'h1' }], artifacts: ['JSON'] }),
+        JSON.stringify({
+          fields: [{ name: 'title', selector: 'h1' }],
+          artifacts: ['JSON'],
+        }),
       ],
     );
     definitionId = definition.rows[0].id;

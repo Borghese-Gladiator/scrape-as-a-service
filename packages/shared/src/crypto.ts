@@ -41,7 +41,10 @@ export function loadEncryptionKey(env: NodeJS.ProcessEnv = process.env): Buffer 
   return key;
 }
 
-export function encryptSecret(plaintext: string, key: Buffer = loadEncryptionKey()): string {
+export function encryptSecret(
+  plaintext: string,
+  key: Buffer = loadEncryptionKey(),
+): string {
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv(ALGORITHM, key, iv);
   const body = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
@@ -54,7 +57,10 @@ export function encryptSecret(plaintext: string, key: Buffer = loadEncryptionKey
   ].join('.');
 }
 
-export function decryptSecret(payload: string, key: Buffer = loadEncryptionKey()): string {
+export function decryptSecret(
+  payload: string,
+  key: Buffer = loadEncryptionKey(),
+): string {
   const parts = payload.split('.');
   if (parts.length !== 4 || parts[0] !== PAYLOAD_VERSION) {
     throw new SecretCryptoError('Secret payload is malformed');

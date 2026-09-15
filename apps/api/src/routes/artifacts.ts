@@ -103,9 +103,12 @@ export function artifactsRouter(pool: Pool, storage: StorageClient): Router {
 
       const used = new Set<string>();
       for (const artifact of artifacts) {
-        archive.append(lazyObjectStream(() => storage.getStream(artifact.object_key)), {
-          name: entryName(artifact, used),
-        });
+        archive.append(
+          lazyObjectStream(() => storage.getStream(artifact.object_key)),
+          {
+            name: entryName(artifact, used),
+          },
+        );
       }
       await archive.finalize();
     }),
@@ -120,7 +123,10 @@ export function artifactsRouter(pool: Pool, storage: StorageClient): Router {
       }
       const stream = await storage.getStream(artifact.object_key);
       res.setHeader('Content-Type', artifact.content_type);
-      res.setHeader('Content-Disposition', `attachment; filename="${artifactFilename(artifact)}"`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${artifactFilename(artifact)}"`,
+      );
       stream.on('error', (err) => {
         res.destroy(err);
       });

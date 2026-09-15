@@ -10,7 +10,9 @@ export type CatchUpPolicy = 'skip' | 'runOnce';
 export const CATCH_UP_POLICIES: readonly CatchUpPolicy[] = ['skip', 'runOnce'];
 
 export function isCatchUpPolicy(value: unknown): value is CatchUpPolicy {
-  return typeof value === 'string' && (CATCH_UP_POLICIES as readonly string[]).includes(value);
+  return (
+    typeof value === 'string' && (CATCH_UP_POLICIES as readonly string[]).includes(value)
+  );
 }
 
 export interface ScrapeDefinition {
