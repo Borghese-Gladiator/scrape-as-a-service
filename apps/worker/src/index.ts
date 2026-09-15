@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import { Worker } from 'bullmq';
-import { chromium, type Browser } from 'playwright';
+import { chromium } from 'playwright';
 import { closePool, getPool } from '@scraper/db';
 import {
   getRedisConnection,
@@ -11,6 +11,7 @@ import {
   SCRAPE_QUEUE_NAME,
   type ScrapeJobData,
 } from '@scraper/shared';
+import { createBrowserPool } from './browser.js';
 import { processRun } from './process-run.js';
 
 export async function startWorker(): Promise<void> {
@@ -20,7 +21,7 @@ export async function startWorker(): Promise<void> {
   await storage.ensureBucket();
 
   const workerId = `${hostname()}-${randomUUID()}`;
-  const openBrowsers = new Set<Browser>();
+  const browsers = createBrowserPool(() => chromium.launch());
 
   const worker = new Worker<ScrapeJobData>(
     SCRAPE_QUEUE_NAME,
@@ -29,12 +30,8 @@ export async function startWorker(): Promise<void> {
         pool,
         storage,
         workerId,
-        launchBrowser: async () => {
-          const browser = await chromium.launch();
-          openBrowsers.add(browser);
-          browser.once('disconnected', () => openBrowsers.delete(browser));
-          return browser;
-        },
+        getBrowser: () => browsers.get(),
+        runTimeoutMs: config.runTimeoutMs,
       });
     },
     {
@@ -54,7 +51,7 @@ export async function startWorker(): Promise<void> {
     async () => {
       // close() drains the active jobs and closes the Redis connection BullMQ owns.
       await worker.close();
-      await Promise.all([...openBrowsers].map((browser) => browser.close().catch(() => {})));
+      await browsers.close();
       await closePool();
     },
     {
@@ -66,7 +63,9 @@ export async function startWorker(): Promise<void> {
   );
 
   // eslint-disable-next-line no-console
-  console.log(`worker ${workerId} started (concurrency=${config.workerConcurrency})`);
+  console.log(
+    `worker ${workerId} started (concurrency=${config.workerConcurrency}, timeout=${config.runTimeoutMs}ms)`,
+  );
 }
 
 const isMain = process.argv[1]?.endsWith('index.js');

@@ -5,7 +5,7 @@ import type {
   StorageClient,
   StoragePutResult,
 } from '@scraper/shared';
-import { runObjectKey } from '@scraper/shared';
+import { runObjectKey, ScrapeError } from '@scraper/shared';
 
 function csvEscape(value: string | null): string {
   const s = value ?? '';
@@ -110,7 +110,12 @@ export async function buildAndUploadArtifacts(
   const uploaded: Array<{ type: ArtifactType; put: StoragePutResult }> = [];
   for (const artifact of built) {
     const key = runObjectKey(runId, artifact.filename);
-    const put = await storage.put(key, artifact.body, artifact.contentType);
+    let put: StoragePutResult;
+    try {
+      put = await storage.put(key, artifact.body, artifact.contentType);
+    } catch (err) {
+      throw new ScrapeError('STORAGE_FAILED', `upload of ${key} failed`, { cause: err });
+    }
     uploaded.push({ type: artifact.type, put });
   }
   return uploaded;

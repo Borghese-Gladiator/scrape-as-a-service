@@ -13,6 +13,36 @@ export interface Queryable {
   ): Promise<QueryResult<R>>;
 }
 
+/**
+ * Minimal connection surface shared by pg.Pool and a test double. A client is
+ * a Queryable that must be released back to the pool.
+ */
+export interface Connectable {
+  connect(): Promise<Queryable & { release(): void }>;
+}
+
+/**
+ * Run `fn` inside a single transaction on one connection. Commits on return,
+ * rolls back on a throw, and always releases the connection.
+ */
+export async function withTransaction<T>(
+  pool: Connectable,
+  fn: (tx: Queryable) => Promise<T>,
+): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 let poolSingleton: Pool | undefined;
 
 export function getPool(config: AppConfig = loadConfig()): Pool {

@@ -101,6 +101,7 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET:-scraper-artifacts}
       MINIO_USE_SSL: "false"
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      RUN_TIMEOUT_MS: ${RUN_TIMEOUT_MS:-120000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -125,6 +126,7 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET:-scraper-artifacts}
       MINIO_USE_SSL: "false"
       SCHEDULER_INTERVAL_MS: ${SCHEDULER_INTERVAL_MS:-10000}
+      STALE_ATTEMPT_MINUTES: ${STALE_ATTEMPT_MINUTES:-10}
     depends_on:
       postgres:
         condition: service_healthy

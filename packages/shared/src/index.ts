@@ -1,4 +1,5 @@
 export * from './config.js';
+export * from './errors.js';
 export * from './scrape-config.js';
 export * from './cron.js';
 export * from './queue.js';
