@@ -5,6 +5,13 @@ export type { ArtifactType, ScrapeConfig };
 export type RunStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
 export type AttemptStatus = 'RUNNING' | 'SUCCEEDED' | 'FAILED';
 export type RunTrigger = 'MANUAL' | 'API' | 'SCHEDULE';
+export type CatchUpPolicy = 'skip' | 'runOnce';
+
+export const CATCH_UP_POLICIES: readonly CatchUpPolicy[] = ['skip', 'runOnce'];
+
+export function isCatchUpPolicy(value: unknown): value is CatchUpPolicy {
+  return typeof value === 'string' && (CATCH_UP_POLICIES as readonly string[]).includes(value);
+}
 
 export interface ScrapeDefinition {
   id: string;
@@ -22,6 +29,7 @@ export interface ScrapeSchedule {
   enabled: boolean;
   last_run_at: Date | null;
   next_run_at: Date | null;
+  catch_up: CatchUpPolicy;
   created_at: Date;
 }
 
@@ -45,6 +53,7 @@ export interface ScrapeRunAttempt {
   error_code: string | null;
   error_message: string | null;
   started_at: Date;
+  heartbeat_at: Date | null;
   finished_at: Date | null;
 }
 
@@ -52,6 +61,8 @@ export interface Artifact {
   id: string;
   run_id: string;
   type: ArtifactType;
+  name: string | null;
+  step_index: number | null;
   object_key: string;
   content_type: string;
   size_bytes: number;
@@ -69,6 +80,7 @@ export interface CreateScheduleInput {
   cron: string;
   timezone: string;
   enabled?: boolean;
+  catchUp?: CatchUpPolicy;
 }
 
 export interface RunDetail extends ScrapeRun {

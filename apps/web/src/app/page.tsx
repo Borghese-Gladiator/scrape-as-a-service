@@ -36,8 +36,8 @@ export default async function DefinitionsPage() {
               <tr>
                 <th>Name</th>
                 <th>URL</th>
-                <th>Fields</th>
-                <th>Artifacts</th>
+                <th>Steps</th>
+                <th>Verbs</th>
               </tr>
             </thead>
             <tbody>
@@ -47,8 +47,8 @@ export default async function DefinitionsPage() {
                     <Link href={`/definitions/${def.id}`}>{def.name}</Link>
                   </td>
                   <td className="muted">{def.url}</td>
-                  <td>{def.config.fields.length}</td>
-                  <td>{def.config.artifacts.join(', ') || '—'}</td>
+                  <td>{def.config.steps.length}</td>
+                  <td>{def.config.steps.map((step) => step.op).join(', ') || '—'}</td>
                 </tr>
               ))}
             </tbody>

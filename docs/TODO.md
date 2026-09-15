@@ -45,6 +45,8 @@ Options to add, in increasing order of effort:
 - A declarative `login` step (navigate, fill, submit, wait) with a secret store.
 
 ### 1.2 No actions — P0
+
+**DONE (phase 2)** — The `Step` union, the validator, and the interpreter replace the single pass.
 `ScrapeConfig` has no concept of an ordered step. It cannot click, type, select,
 scroll, hover, press a key, or wait for navigation. Extraction is read-only.
 
@@ -54,11 +56,15 @@ Proposed shape: an ordered `steps` array with a closed set of verbs
 `validateScrapeConfig` enforces today.
 
 ### 1.3 No pagination — P0
+
+**DONE (phase 2)** — The `paginate` verb walks the pager and stops on a disabled, missing, or unchanged next control.
 The scraper loads one URL, one time. The driving use case has 2 pages; other
 tables have hundreds. There is no next-page selector, no page limit, no
 "until the next button is disabled" loop.
 
 ### 1.4 No new tab or popup handling — P0
+
+**DONE (phase 2)** — `click` with `opens: 'newTab'` waits on the context `page` event; `goBack` closes the tab.
 Nothing listens for `context.on('page')` or `page.waitForEvent('popup')`. A
 button that opens a new tab is invisible to the scraper.
 
@@ -66,11 +72,15 @@ Note: where the control is a real link, reading its `href` and visiting the URL
 directly is more reliable than tab handling. The config should support both.
 
 ### 1.5 No sub-page traversal — P0
+
+**DONE (phase 2)** — `openLink` reads the link target, opens it in a new page, runs nested steps, then closes it.
 There is no way to say "for each row, follow this link, capture the page that
 opens, then come back". `extractRows` reads fields inside a row scope and stops
 (`apps/worker/src/scrape.ts:64`). This is the core of the driving use case.
 
 ### 1.6 One screenshot per run, of the entry page only — P0
+
+**DONE (phase 2)** — The `capture` verb takes a name template, and `PDF` is now an artifact type.
 `buildArtifacts` emits exactly one `screenshot.png`
 (`apps/worker/src/artifacts.ts:63`). There is no per-row, per-element, or
 per-sub-page capture, and no naming scheme for a set of N images. The artifact
@@ -86,6 +96,8 @@ Artifacts go to MinIO and come back one at a time through
 "write to this host directory" mode. Retrieving 50 receipts means 50 clicks.
 
 ### 1.8 Extraction is text-and-attribute only — P2
+
+**DONE (phase 2)** — Partly closed: `extract` now runs at any point and in any scope, and it accumulates across loops. Field-level normalization stays open.
 `readField` returns `textContent` or one attribute
 (`apps/worker/src/scrape.ts:70`). It cannot read a JSON blob out of a
 `<script>` tag, follow a shadow root, read a table by column index, or
@@ -121,7 +133,7 @@ The API registers the `cors` middleware before the routes. The allowlist comes
 from `CORS_ORIGINS`, a comma separated variable that defaults to
 `http://localhost:3000`.
 
-### 2.2 A run can stay RUNNING forever — P1
+### 2.2 A run can stay RUNNING forever — P1 **DONE (phase 3)**
 `processRun` sets the run to RUNNING, and only `finalizeFailure` or the success
 path move it out. If the worker process dies mid-job, or the container is
 killed, nothing writes a terminal status. There is no reaper, no lease, and no
@@ -143,7 +155,7 @@ open browser, and closes the pool. The scheduler waits for the poll in flight,
 then closes the queue and the pool. A 15 second timer exits either process
 anyway.
 
-### 2.4 The scheduler is not safe to run more than once — P1
+### 2.4 The scheduler is not safe to run more than once — P1 **DONE (phase 3)**
 `pollOnce` reads due schedules, then creates a run, then advances `next_run_at`
 (`apps/scheduler/src/poll.ts:19`). There is no row lock and no transaction. Two
 scheduler replicas both see the same due schedule and both create a run.
@@ -153,7 +165,7 @@ runs are separate rows with separate ids, so both are enqueued.
 Fix: `SELECT ... FOR UPDATE SKIP LOCKED`, or claim the schedule with a
 conditional `UPDATE ... WHERE next_run_at <= now()` that returns the claimed row.
 
-### 2.5 Missed schedules are dropped silently — P1
+### 2.5 Missed schedules are dropped silently — P1 **DONE (phase 3)**
 `computeNextRun(cron, tz, now)` computes the next fire time from *now*, not from
 `last_run_at` (`apps/scheduler/src/poll.ts:24`). If the scheduler is down for a
 day, every window in that day is skipped with no record. There is no catch-up
@@ -186,13 +198,13 @@ Fix: `started_at = COALESCE(started_at, $3)`.
 `updateRunStatus` writes `COALESCE(started_at, $3)`, so a retry keeps the start
 time of the first attempt.
 
-### 2.8 No per-run timeout — P1
+### 2.8 No per-run timeout — P1 **DONE (phase 3)**
 Only `page.goto` has Playwright's default 30-second cap. A scrape over many rows,
 or a page that never settles, has no overall limit. The job holds a worker slot
 until BullMQ's stall detection fires 30 seconds later, and stall recovery can
 then run the same job twice.
 
-### 2.9 One Chromium process per job — P2
+### 2.9 One Chromium process per job — P2 **DONE (phase 3)**
 `launchBrowser: () => chromium.launch()` starts a full browser for every job
 (`apps/worker/src/index.ts:31`). At `WORKER_CONCURRENCY=4` that is four Chromium
 processes launched and torn down per batch. Launch cost dominates short scrapes.
@@ -274,7 +286,7 @@ The route is gone. `POST /runs` takes an optional `trigger` field with the
 values `MANUAL` and `API`, and defaults to `MANUAL`. Any other value answers
 400. The README documents the route and the field.
 
-### 4.7 No structured error taxonomy — P2
+### 4.7 No structured error taxonomy — P2 **DONE (phase 3)**
 `errorCode` returns `err.name`, which for a plain `Error` is the literal string
 `"Error"` (`apps/worker/src/process-run.ts:22`). Almost every failure is
 therefore recorded as `Error` with a free-text message. There is no way to
@@ -284,12 +296,12 @@ count timeouts against selector misses against network failures.
 
 ## 5. Observability
 
-### 5.1 Logging is `console.log` — P1
+### 5.1 Logging is `console.log` — P1 — **DONE (phase 6)**
 There is no structured logger, no log level, no request id, and no run id on
 worker log lines. Correlating a failed run to its logs means guessing from
 timestamps.
 
-### 5.2 No health endpoint on worker or scheduler — P2
+### 5.2 No health endpoint on worker or scheduler — P2 — **DONE (phase 6)**
 Only the API has `/health`. The compose file gives worker and scheduler no
 healthcheck, so a crash-looping worker looks the same as a healthy one in
 `docker compose ps`.
@@ -299,12 +311,12 @@ Nothing reports queue depth, active jobs, failure rate, or run duration. There i
 no Bull Board or equivalent. When runs stop appearing, there is no way to tell
 whether the queue is backed up or the scheduler is dead.
 
-### 5.4 The UI does not refresh — P2
+### 5.4 The UI does not refresh — P2 — **DONE (phase 6)**
 Every page is `dynamic = 'force-dynamic'` server-rendered once. A QUEUED run
 needs a manual browser reload to show progress. There is no polling, no
 streaming, and no auto-refresh on the run detail page.
 
-### 5.5 Run and attempt records carry no diagnostics — P2
+### 5.5 Run and attempt records carry no diagnostics — P2 — **DONE (phase 6)**
 When a run fails there is only an error string. There is no failure screenshot,
 no captured HTML at the point of failure, no console log from the page, and no
 network trace. Debugging a broken selector means reproducing it by hand.
@@ -328,6 +340,13 @@ stack. The CORS failure in 2.1 is exactly the class of bug an end-to-end test
 catches and unit tests cannot.
 
 ### 6.3 Untested modules — P2
+
+**DONE (phase 2)** — the `toCsv` and `runScrape` parts. `toCsv` has direct
+tests. The interpreter that `runScrape` drives has one test per verb against a
+fake Playwright page, plus the composite and limit cases.
+`validateScrapeConfig` has its own test file. The `schedules` and `artifacts`
+routers still have no test.
+
 `runScrape` (`apps/worker/src/scrape.ts`) has no test at all. `toCsv` has no
 direct test, despite hand-rolled quoting and escaping. `validateScrapeConfig` is
 covered only indirectly through an API route test. `apps/api` route tests cover

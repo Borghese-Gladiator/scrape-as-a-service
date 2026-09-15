@@ -2,7 +2,7 @@ import type { Queryable } from '../client.js';
 import type { CreateScheduleInput, ScrapeSchedule } from '../types.js';
 
 const COLUMNS =
-  'id, definition_id, cron, timezone, enabled, last_run_at, next_run_at, created_at';
+  'id, definition_id, cron, timezone, enabled, last_run_at, next_run_at, catch_up, created_at';
 
 export async function createSchedule(
   db: Queryable,
@@ -10,10 +10,17 @@ export async function createSchedule(
   nextRunAt: Date,
 ): Promise<ScrapeSchedule | null> {
   const { rows } = await db.query<ScrapeSchedule>(
-    `INSERT INTO scrape_schedules (definition_id, cron, timezone, enabled, next_run_at)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO scrape_schedules (definition_id, cron, timezone, enabled, next_run_at, catch_up)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING ${COLUMNS}`,
-    [input.definitionId, input.cron, input.timezone, input.enabled ?? true, nextRunAt],
+    [
+      input.definitionId,
+      input.cron,
+      input.timezone,
+      input.enabled ?? true,
+      nextRunAt,
+      input.catchUp ?? 'skip',
+    ],
   );
   return rows[0] ?? null;
 }
@@ -59,6 +66,26 @@ export async function findDueSchedules(
     [now],
   );
   return rows;
+}
+
+/**
+ * Claim one due schedule for this transaction. SKIP LOCKED hands a schedule
+ * already claimed by another poller to nobody, so a due schedule produces
+ * exactly one run. Must run inside a transaction: the lock is held to COMMIT.
+ */
+export async function claimDueSchedule(
+  db: Queryable,
+  now: Date,
+): Promise<ScrapeSchedule | null> {
+  const { rows } = await db.query<ScrapeSchedule>(
+    `SELECT ${COLUMNS} FROM scrape_schedules
+     WHERE enabled = TRUE AND next_run_at IS NOT NULL AND next_run_at <= $1
+     ORDER BY next_run_at ASC
+     LIMIT 1
+     FOR UPDATE SKIP LOCKED`,
+    [now],
+  );
+  return rows[0] ?? null;
 }
 
 export async function advanceSchedule(

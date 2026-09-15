@@ -1,11 +1,12 @@
 import type {
   ArtifactType,
   ScrapeConfig,
-  ScrapeResult,
   StorageClient,
   StoragePutResult,
 } from '@scraper/shared';
-import { runObjectKey } from '@scraper/shared';
+import { runObjectKey, ScrapeError } from '@scraper/shared';
+import type { ScrapeDiagnostics } from './diagnostics.js';
+import type { ScrapeResult } from './interpreter.js';
 
 function csvEscape(value: string | null): string {
   const s = value ?? '';
@@ -37,81 +38,105 @@ export function toCsv(rows: Record<string, string | null>[]): Buffer {
   return Buffer.from(lines.join('\n'), 'utf8');
 }
 
-interface BuiltArtifact {
+/**
+ * A config that `upgradeScrapeConfig` produced names its extract `rows` and its
+ * capture `page`. Map those back to the v1 filenames, so an old definition
+ * keeps producing the files its consumers expect.
+ */
+const V1_ARTIFACT_NAMES: Record<string, string> = {
+  'rows.json': 'data.json',
+  'rows.csv': 'data.csv',
+  'page.png': 'screenshot.png',
+  'page.html': 'source.html',
+};
+
+export function artifactFilename(config: ScrapeConfig, name: string): string {
+  if (config.upgradedFrom !== 1) return name;
+  return V1_ARTIFACT_NAMES[name] ?? name;
+}
+
+export interface UploadedArtifact {
   type: ArtifactType;
-  filename: string;
-  body: Buffer;
-  contentType: string;
+  name: string;
+  stepIndex: number;
+  put: StoragePutResult;
 }
 
-function buildArtifacts(config: ScrapeConfig, result: ScrapeResult): BuiltArtifact[] {
-  const built: BuiltArtifact[] = [];
-  for (const type of config.artifacts) {
-    switch (type) {
-      case 'JSON':
-        built.push({
-          type,
-          filename: 'data.json',
-          body: Buffer.from(JSON.stringify(result.rows, null, 2), 'utf8'),
-          contentType: 'application/json',
-        });
-        break;
-      case 'CSV':
-        built.push({
-          type,
-          filename: 'data.csv',
-          body: toCsv(result.rows),
-          contentType: 'text/csv',
-        });
-        break;
-      case 'PNG':
-        if (result.screenshot) {
-          built.push({
-            type,
-            filename: 'screenshot.png',
-            body: result.screenshot,
-            contentType: 'image/png',
-          });
-        }
-        break;
-      case 'HTML':
-        if (result.html !== undefined) {
-          built.push({
-            type,
-            filename: 'source.html',
-            body: Buffer.from(result.html, 'utf8'),
-            contentType: 'text/html',
-          });
-        }
-        break;
-      case 'WEBM':
-        if (result.recording) {
-          built.push({
-            type,
-            filename: 'recording.webm',
-            body: result.recording,
-            contentType: 'video/webm',
-          });
-        }
-        break;
-    }
-  }
-  return built;
-}
-
-/** Serialize requested artifacts and upload each to MinIO under runs/<run-id>/. */
+/** Upload every captured artifact to MinIO under runs/<run-id>/. */
 export async function buildAndUploadArtifacts(
   storage: StorageClient,
   runId: string,
   config: ScrapeConfig,
   result: ScrapeResult,
-): Promise<Array<{ type: ArtifactType; put: StoragePutResult }>> {
-  const built = buildArtifacts(config, result);
-  const uploaded: Array<{ type: ArtifactType; put: StoragePutResult }> = [];
-  for (const artifact of built) {
-    const key = runObjectKey(runId, artifact.filename);
-    const put = await storage.put(key, artifact.body, artifact.contentType);
-    uploaded.push({ type: artifact.type, put });
+): Promise<UploadedArtifact[]> {
+  const uploaded: UploadedArtifact[] = [];
+  for (const artifact of result.artifacts) {
+    const name = artifactFilename(config, artifact.name);
+    const key = runObjectKey(runId, name);
+    let put: StoragePutResult;
+    try {
+      put = await storage.put(key, artifact.body, artifact.contentType);
+    } catch (err) {
+      throw new ScrapeError('STORAGE_FAILED', `upload of ${key} failed`, { cause: err });
+    }
+    uploaded.push({ type: artifact.type, name, stepIndex: artifact.stepIndex, put });
+  }
+  return uploaded;
+}
+
+interface BuiltDiagnosticArtifact {
+  type: ArtifactType;
+  name: string;
+  body: Buffer;
+  contentType: string;
+}
+
+function buildDiagnosticArtifacts(diagnostics: ScrapeDiagnostics): BuiltDiagnosticArtifact[] {
+  const built: BuiltDiagnosticArtifact[] = [];
+  if (diagnostics.screenshot) {
+    built.push({
+      type: 'PNG',
+      name: 'failure-screenshot.png',
+      body: diagnostics.screenshot,
+      contentType: 'image/png',
+    });
+  }
+  if (diagnostics.html !== undefined) {
+    built.push({
+      type: 'HTML',
+      name: 'failure-source.html',
+      body: Buffer.from(diagnostics.html, 'utf8'),
+      contentType: 'text/html',
+    });
+  }
+  if (diagnostics.console !== undefined) {
+    built.push({
+      type: 'JSON',
+      name: 'failure-console.json',
+      body: Buffer.from(JSON.stringify(diagnostics.console, null, 2), 'utf8'),
+      contentType: 'application/json',
+    });
+  }
+  return built;
+}
+
+/**
+ * Upload whatever a failed scrape managed to capture, under the same prefix.
+ * These artifacts belong to no step, so `stepIndex` is -1.
+ */
+export async function uploadFailureDiagnostics(
+  storage: StorageClient,
+  runId: string,
+  diagnostics: ScrapeDiagnostics,
+): Promise<UploadedArtifact[]> {
+  const uploaded: UploadedArtifact[] = [];
+  for (const artifact of buildDiagnosticArtifacts(diagnostics)) {
+    const put = await storage.put(
+      runObjectKey(runId, artifact.name),
+      artifact.body,
+      artifact.contentType,
+    );
+    uploaded.push({ type: artifact.type, name: artifact.name, stepIndex: -1, put });
   }
   return uploaded;
 }

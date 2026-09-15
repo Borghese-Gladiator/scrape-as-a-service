@@ -5,13 +5,16 @@ import type { Queue } from 'bullmq';
 import { getPool, runMigrations } from '@scraper/db';
 import {
   DEFAULT_CORS_ORIGINS,
+  createLogger,
   getQueue,
   getStorage,
   loadConfig,
+  type Logger,
   type ScrapeJobData,
   type StorageClient,
 } from '@scraper/shared';
 import { errorMiddleware } from './http.js';
+import { requestLogger } from './logging.js';
 import { definitionsRouter } from './routes/definitions.js';
 import { schedulesRouter } from './routes/schedules.js';
 import { runsRouter } from './routes/runs.js';
@@ -22,10 +25,12 @@ export function createServer(
   queue: Queue<ScrapeJobData>,
   storage: StorageClient,
   corsOrigins: string[] = DEFAULT_CORS_ORIGINS,
+  logger: Logger = createLogger('api'),
 ): Express {
   const app = express();
   app.use(cors({ origin: corsOrigins }));
   app.use(express.json());
+  app.use(requestLogger(logger));
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
@@ -42,6 +47,7 @@ export function createServer(
 
 export async function startApi(): Promise<void> {
   const config = loadConfig();
+  const logger = createLogger('api');
   const pool = getPool(config);
   await runMigrations(pool);
 
@@ -49,19 +55,17 @@ export async function startApi(): Promise<void> {
   await storage.ensureBucket();
 
   const queue = getQueue(config);
-  const app = createServer(pool, queue, storage, config.corsOrigins);
+  const app = createServer(pool, queue, storage, config.corsOrigins, logger);
 
   app.listen(config.apiPort, () => {
-    // eslint-disable-next-line no-console
-    console.log(`api listening on :${config.apiPort}`);
+    logger.info({ port: config.apiPort }, 'api listening');
   });
 }
 
 const isMain = process.argv[1]?.endsWith('server.js');
 if (isMain) {
   startApi().catch((err) => {
-    // eslint-disable-next-line no-console
-    console.error(err);
+    createLogger('api').fatal({ err }, 'api failed to start');
     process.exit(1);
   });
 }

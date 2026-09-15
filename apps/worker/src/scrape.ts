@@ -1,103 +1,73 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Browser } from 'playwright';
-import type { ScrapeConfig, ScrapeResult } from '@scraper/shared';
+import type { Browser, BrowserContext } from 'playwright';
+import type { ScrapeConfig } from '@scraper/shared';
+import { runProgram, type RunScrapeOptions, type ScrapeResult } from './interpreter.js';
+import { attachDiagnostics, collectConsole, type ConsoleEntry } from './diagnostics.js';
 
-function needsRecording(config: ScrapeConfig): boolean {
-  return config.artifacts.includes('WEBM');
+export interface ScrapeSession {
+  context: BrowserContext;
+  recordDir?: string;
 }
 
 /**
- * Execute a declarative scrape in an isolated browser context. No arbitrary JS
- * is evaluated in the page: extraction is driven purely by CSS selectors and
- * optional attribute reads.
+ * The context and its temporary recording directory are opened and closed by
+ * the caller, not by runScrape, so that a caller that abandons a scrape (a run
+ * timeout) can still release the context.
  */
-export async function runScrape(
+export async function openScrapeSession(
   browser: Browser,
-  url: string,
   config: ScrapeConfig,
-): Promise<ScrapeResult> {
-  const recording = needsRecording(config);
-  let recordDir: string | undefined;
-  if (recording) {
-    recordDir = await mkdtemp(join(tmpdir(), 'scrape-rec-'));
-  }
-
+): Promise<ScrapeSession> {
+  const recordDir =
+    config.record === true ? await mkdtemp(join(tmpdir(), 'scrape-rec-')) : undefined;
   const context = await browser.newContext(
     recordDir ? { recordVideo: { dir: recordDir } } : {},
   );
-  const page = await context.newPage();
+  return recordDir ? { context, recordDir } : { context };
+}
 
-  try {
-    await page.goto(url, { waitUntil: 'load' });
-    if (config.waitFor) {
-      await page.waitForSelector(config.waitFor);
-    }
-
-    const rows = await extractRows(page, config);
-
-    const result: ScrapeResult = { rows };
-
-    if (config.artifacts.includes('HTML')) {
-      result.html = await page.content();
-    }
-    if (config.artifacts.includes('PNG')) {
-      result.screenshot = await page.screenshot({ fullPage: true });
-    }
-
-    const video = recording ? page.video() : null;
-    await page.close();
-    await context.close();
-
-    if (video) {
-      const videoPath = await video.path();
-      result.recording = await readFile(videoPath);
-    }
-
-    return result;
-  } finally {
-    if (!page.isClosed()) await page.close().catch(() => {});
-    await context.close().catch(() => {});
-    if (recordDir) await rm(recordDir, { recursive: true, force: true }).catch(() => {});
+export async function closeScrapeSession(session: ScrapeSession): Promise<void> {
+  await session.context.close().catch(() => {});
+  if (session.recordDir) {
+    await rm(session.recordDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
-async function extractRows(
-  page: import('playwright').Page,
+/**
+ * Run a step program in an isolated browser context. Phase 4 replaces
+ * `browser.newContext()` here with the three auth modes.
+ */
+export async function runScrape(
+  session: ScrapeSession,
+  url: string,
   config: ScrapeConfig,
-): Promise<Record<string, string | null>[]> {
-  const readField = async (
-    scope: import('playwright').Locator,
-    selector: string,
-    attribute?: string,
-  ): Promise<string | null> => {
-    const el = scope.locator(selector).first();
-    if ((await el.count()) === 0) return null;
-    if (attribute) {
-      return el.getAttribute(attribute);
-    }
-    return (await el.textContent())?.trim() ?? null;
-  };
+  options?: RunScrapeOptions,
+): Promise<ScrapeResult> {
+  const { context } = session;
+  const record = config.record === true;
+  const consoleByPage: ConsoleEntry[][] = [];
+  context.on('page', (page) => consoleByPage.push(collectConsole(page)));
 
-  if (config.rowSelector) {
-    const rowLocators = page.locator(config.rowSelector);
-    const count = await rowLocators.count();
-    const rows: Record<string, string | null>[] = [];
-    for (let i = 0; i < count; i += 1) {
-      const rowScope = rowLocators.nth(i);
-      const row: Record<string, string | null> = {};
-      for (const field of config.fields) {
-        row[field.name] = await readField(rowScope, field.selector, field.attribute);
-      }
-      rows.push(row);
-    }
-    return rows;
-  }
+  try {
+    const result = await runProgram(context, url, config, options);
 
-  const row: Record<string, string | null> = {};
-  for (const field of config.fields) {
-    row[field.name] = await readField(page.locator('body'), field.selector, field.attribute);
+    // context.close() flushes the video file, so read the path only after it.
+    const video = record ? (context.pages()[0]?.video() ?? null) : null;
+    await context.close();
+    if (video) {
+      result.artifacts.push({
+        type: 'WEBM',
+        name: 'recording.webm',
+        body: await readFile(await video.path()),
+        contentType: 'video/webm',
+        stepIndex: 0,
+      });
+    }
+    return result;
+  } catch (err) {
+    const page = context.pages().at(-1);
+    throw await attachDiagnostics(err, page, consoleByPage.flat());
   }
-  return [row];
 }

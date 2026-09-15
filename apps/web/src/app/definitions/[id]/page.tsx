@@ -118,28 +118,16 @@ export default function DefinitionDetailPage() {
       </div>
 
       <div className="card">
-        <h2>Configuration</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Field</th>
-              <th>Selector</th>
-              <th>Attribute</th>
-            </tr>
-          </thead>
-          <tbody>
-            {definition.config.fields.map((field) => (
-              <tr key={field.name}>
-                <td>{field.name}</td>
-                <td>{field.selector}</td>
-                <td>{field.attribute ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="muted" style={{ marginTop: '0.75rem' }}>
-          Artifacts: {definition.config.artifacts.join(', ') || '—'}
+        <h2>Step program</h2>
+        <p className="muted">
+          Version {definition.config.version} · {definition.config.steps.length} steps
         </p>
+        <ol>
+          {definition.config.steps.map((step, index) => (
+            <li key={index}>{step.op}</li>
+          ))}
+        </ol>
+        <pre style={{ overflowX: 'auto' }}>{JSON.stringify(definition.config, null, 2)}</pre>
       </div>
 
       <div className="card">

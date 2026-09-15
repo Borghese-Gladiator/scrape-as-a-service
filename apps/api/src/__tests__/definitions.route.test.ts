@@ -33,7 +33,7 @@ const queue = { add: vi.fn() } as unknown as Queue<ScrapeJobData>;
 const storage = {} as never;
 
 describe('POST /definitions config parsing', () => {
-  it('accepts a valid declarative config and persists the parsed shape', async () => {
+  it('accepts a v1 config and persists the upgraded v2 step program', async () => {
     const captured: { config?: unknown } = {};
     const app = createServer(fakePool(captured), queue, storage);
 
@@ -55,20 +55,69 @@ describe('POST /definitions config parsing', () => {
 
     expect(res.status).toBe(201);
     expect(captured.config).toEqual({
-      waitFor: '#ready',
-      rowSelector: 'table tr',
-      fields: [
-        { name: 'title', selector: 'td.title' },
-        { name: 'href', selector: 'a', attribute: 'href' },
+      version: 2,
+      upgradedFrom: 1,
+      steps: [
+        { op: 'goto' },
+        { op: 'waitFor', selector: '#ready' },
+        {
+          op: 'extract',
+          name: 'rows',
+          rowSelector: 'table tr',
+          fields: [
+            { name: 'title', selector: 'td.title' },
+            { name: 'href', selector: 'a', attribute: 'href' },
+          ],
+          emit: ['JSON', 'CSV'],
+        },
+        { op: 'capture', as: ['PNG'], name: 'page' },
       ],
-      artifacts: ['JSON', 'CSV', 'PNG'],
     });
+  });
+
+  it('accepts a v2 step program and persists it unchanged', async () => {
+    const captured: { config?: unknown } = {};
+    const app = createServer(fakePool(captured), queue, storage);
+
+    const config = {
+      version: 2,
+      steps: [
+        { op: 'goto' },
+        {
+          op: 'paginate',
+          nextSelector: 'a.next',
+          maxPages: 2,
+          steps: [
+            {
+              op: 'forEach',
+              rowSelector: 'tbody tr',
+              steps: [
+                {
+                  op: 'openLink',
+                  selector: 'a.receipt',
+                  steps: [{ op: 'capture', as: ['PNG'], name: 'receipt-{{index}}' }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const res = await request(app)
+      .post('/definitions')
+      .send({ name: 'Receipts', url: 'https://example.com', config });
+
+    expect(res.status).toBe(201);
+    expect(captured.config).toEqual(config);
   });
 
   it.each([
     { desc: 'empty fields', config: { fields: [], artifacts: ['JSON'] } },
     { desc: 'bad artifact type', config: { fields: [{ name: 'a', selector: 'b' }], artifacts: ['EXE'] } },
     { desc: 'missing selector', config: { fields: [{ name: 'a' }], artifacts: [] } },
+    { desc: 'unknown step verb', config: { version: 2, steps: [{ op: 'evaluate', code: 'alert(1)' }] } },
+    { desc: 'empty step program', config: { version: 2, steps: [] } },
   ])('rejects invalid config: $desc', async ({ config }) => {
     const app = createServer(fakePool({}), queue, storage);
     const res = await request(app)
