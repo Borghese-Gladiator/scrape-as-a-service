@@ -45,6 +45,8 @@ Options to add, in increasing order of effort:
 - A declarative `login` step (navigate, fill, submit, wait) with a secret store.
 
 ### 1.2 No actions — P0
+
+**DONE (phase 2)** — The `Step` union, the validator, and the interpreter replace the single pass.
 `ScrapeConfig` has no concept of an ordered step. It cannot click, type, select,
 scroll, hover, press a key, or wait for navigation. Extraction is read-only.
 
@@ -54,11 +56,15 @@ Proposed shape: an ordered `steps` array with a closed set of verbs
 `validateScrapeConfig` enforces today.
 
 ### 1.3 No pagination — P0
+
+**DONE (phase 2)** — The `paginate` verb walks the pager and stops on a disabled, missing, or unchanged next control.
 The scraper loads one URL, one time. The driving use case has 2 pages; other
 tables have hundreds. There is no next-page selector, no page limit, no
 "until the next button is disabled" loop.
 
 ### 1.4 No new tab or popup handling — P0
+
+**DONE (phase 2)** — `click` with `opens: 'newTab'` waits on the context `page` event; `goBack` closes the tab.
 Nothing listens for `context.on('page')` or `page.waitForEvent('popup')`. A
 button that opens a new tab is invisible to the scraper.
 
@@ -66,11 +72,15 @@ Note: where the control is a real link, reading its `href` and visiting the URL
 directly is more reliable than tab handling. The config should support both.
 
 ### 1.5 No sub-page traversal — P0
+
+**DONE (phase 2)** — `openLink` reads the link target, opens it in a new page, runs nested steps, then closes it.
 There is no way to say "for each row, follow this link, capture the page that
 opens, then come back". `extractRows` reads fields inside a row scope and stops
 (`apps/worker/src/scrape.ts:64`). This is the core of the driving use case.
 
 ### 1.6 One screenshot per run, of the entry page only — P0
+
+**DONE (phase 2)** — The `capture` verb takes a name template, and `PDF` is now an artifact type.
 `buildArtifacts` emits exactly one `screenshot.png`
 (`apps/worker/src/artifacts.ts:63`). There is no per-row, per-element, or
 per-sub-page capture, and no naming scheme for a set of N images. The artifact
@@ -86,6 +96,8 @@ Artifacts go to MinIO and come back one at a time through
 "write to this host directory" mode. Retrieving 50 receipts means 50 clicks.
 
 ### 1.8 Extraction is text-and-attribute only — P2
+
+**DONE (phase 2)** — Partly closed: `extract` now runs at any point and in any scope, and it accumulates across loops. Field-level normalization stays open.
 `readField` returns `textContent` or one attribute
 (`apps/worker/src/scrape.ts:70`). It cannot read a JSON blob out of a
 `<script>` tag, follow a shadow root, read a table by column index, or
@@ -328,6 +340,13 @@ stack. The CORS failure in 2.1 is exactly the class of bug an end-to-end test
 catches and unit tests cannot.
 
 ### 6.3 Untested modules — P2
+
+**DONE (phase 2)** — the `toCsv` and `runScrape` parts. `toCsv` has direct
+tests. The interpreter that `runScrape` drives has one test per verb against a
+fake Playwright page, plus the composite and limit cases.
+`validateScrapeConfig` has its own test file. The `schedules` and `artifacts`
+routers still have no test.
+
 `runScrape` (`apps/worker/src/scrape.ts`) has no test at all. `toCsv` has no
 direct test, despite hand-rolled quoting and escaping. `validateScrapeConfig` is
 covered only indirectly through an API route test. `apps/api` route tests cover

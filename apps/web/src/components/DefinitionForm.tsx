@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import {
-  ARTIFACT_TYPES,
+  V1_ARTIFACT_TYPES,
   type ArtifactType,
   type CreateDefinitionInput,
   type ScrapeFieldSelector,
@@ -181,7 +181,7 @@ export function DefinitionForm({
       <div className="field-row">
         <label>Requested artifacts</label>
         <div className="inline">
-          {ARTIFACT_TYPES.map((type) => (
+          {V1_ARTIFACT_TYPES.map((type) => (
             <div className="checkbox-row" key={type}>
               <input
                 id={`artifact-${type}`}

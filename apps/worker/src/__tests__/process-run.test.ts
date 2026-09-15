@@ -29,15 +29,18 @@ interface AttemptRow extends QueryResultRow {
 }
 
 const DEF_CONFIG: ScrapeConfig = {
-  fields: [{ name: 'title', selector: 'h1' }],
-  artifacts: ['JSON'],
+  version: 2,
+  steps: [
+    { op: 'goto' },
+    { op: 'extract', name: 'rows', fields: [{ name: 'title', selector: 'h1' }] },
+  ],
 };
 
 class FakeDb implements Queryable {
   runStatus = 'QUEUED';
   runFinishedAt: Date | null = null;
   attempts: AttemptRow[] = [];
-  artifacts: Array<{ type: string; object_key: string }> = [];
+  artifacts: Array<{ type: string; name: string; step_index: number; object_key: string }> = [];
   heartbeats = 0;
   private seq = 0;
 
@@ -84,8 +87,14 @@ class FakeDb implements Queryable {
       return [{ id: 'def-1', name: 'd', url: 'https://x', config: DEF_CONFIG, created_at: new Date() }];
     }
     if (text.includes('INSERT INTO artifacts')) {
-      const [, type, objectKey] = values as [string, string, string];
-      this.artifacts.push({ type, object_key: objectKey });
+      const [, type, name, stepIndex, objectKey] = values as [
+        string,
+        string,
+        string,
+        number,
+        string,
+      ];
+      this.artifacts.push({ type, name, step_index: stepIndex, object_key: objectKey });
       return [{ id: `art-${this.artifacts.length}` }];
     }
     throw new Error(`Unhandled query: ${text}`);
@@ -135,7 +144,18 @@ describe('processRun success path', () => {
     const db = new FakeDb();
     const storage = fakeStorage();
     const browser = fakeBrowser();
-    runScrapeMock.mockResolvedValue({ rows: [{ title: 'Hello' }] });
+    runScrapeMock.mockResolvedValue({
+      datasets: { rows: [{ title: 'Hello' }] },
+      artifacts: [
+        {
+          type: 'JSON',
+          name: 'rows.json',
+          body: Buffer.from('[]', 'utf8'),
+          contentType: 'application/json',
+          stepIndex: 1,
+        },
+      ],
+    });
 
     await processRun(fakeJob(0, 3), {
       pool: db,
@@ -150,7 +170,12 @@ describe('processRun success path', () => {
     expect(db.attempts[0]!.status).toBe('SUCCEEDED');
     expect(db.runStatus).toBe('SUCCEEDED');
     expect(db.artifacts).toEqual([
-      { type: 'JSON', object_key: 'runs/run-1/data.json' },
+      {
+        type: 'JSON',
+        name: 'rows.json',
+        step_index: 1,
+        object_key: 'runs/run-1/rows.json',
+      },
     ]);
     expect(closeScrapeSessionMock).toHaveBeenCalledTimes(1);
   });
@@ -251,7 +276,7 @@ describe('processRun browser reuse', () => {
     const db = new FakeDb();
     const browser = fakeBrowser();
     const getBrowser = vi.fn(async () => browser as never);
-    runScrapeMock.mockResolvedValue({ rows: [] });
+    runScrapeMock.mockResolvedValue({ datasets: {}, artifacts: [] });
     const deps = {
       pool: db,
       storage: fakeStorage(),
@@ -294,7 +319,7 @@ describe('processRun heartbeat', () => {
     await vi.advanceTimersByTimeAsync(31_000);
     expect(db.heartbeats).toBe(2);
 
-    finish({ rows: [] });
+    finish({ datasets: {}, artifacts: [] });
     await pending;
 
     await vi.advanceTimersByTimeAsync(60_000);

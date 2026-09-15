@@ -41,7 +41,7 @@ class FakeDb implements Queryable {
       return [{ id: 'def-1', name: 'd', url: 'https://x', config: DEF_CONFIG }];
     }
     if (text.includes('INSERT INTO artifacts')) {
-      const [, type, objectKey] = values as [string, string, string];
+      const [, type, , , objectKey] = values as [string, string, string, number, string];
       this.artifacts.push({ type, object_key: objectKey });
       return [{ id: `art-${this.artifacts.length}` }];
     }

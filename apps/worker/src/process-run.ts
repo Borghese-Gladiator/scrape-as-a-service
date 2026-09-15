@@ -13,13 +13,14 @@ import {
   createLogger,
   ScrapeError,
   toErrorCode,
+  validateScrapeConfig,
   type Logger,
   type ScrapeJobData,
-  type ScrapeResult,
   type StorageClient,
 } from '@scraper/shared';
 import { buildAndUploadArtifacts, uploadFailureDiagnostics } from './artifacts.js';
 import { getDiagnostics } from './diagnostics.js';
+import type { ScrapeResult } from './interpreter.js';
 import { closeScrapeSession, openScrapeSession, runScrape } from './scrape.js';
 
 export const HEARTBEAT_INTERVAL_MS = 15_000;
@@ -122,32 +123,32 @@ export async function processRun(
       if (!definition) {
         throw new Error(`definition not found: ${definitionId}`);
       }
+      // A definition stored before Phase 2 still holds a v1 config; upgrade it.
+      const config = validateScrapeConfig(definition.config);
 
       const browser = await getBrowser();
-      const session = await openScrapeSession(browser, definition.config);
+      const session = await openScrapeSession(browser, config);
       let result: ScrapeResult;
       try {
         result = await withRunTimeout(
-          runScrape(session, definition.url, definition.config),
+          runScrape(session, definition.url, config),
           runTimeoutMs,
         );
       } finally {
         await closeScrapeSession(session);
       }
 
-      const uploaded = await buildAndUploadArtifacts(
-        storage,
-        runId,
-        definition.config,
-        result,
-      );
-      for (const { type, put } of uploaded) {
-        await insertArtifact(pool, runId, type, put);
+      const uploaded = await buildAndUploadArtifacts(storage, runId, config, result);
+      for (const { type, put, name, stepIndex } of uploaded) {
+        await insertArtifact(pool, runId, type, put, name, stepIndex);
       }
 
       await finishAttempt(pool, attempt.id, 'SUCCEEDED');
       await updateRunStatus(pool, runId, 'SUCCEEDED', new Date());
-      logger.info({ artifacts: uploaded.length, rows: result.rows.length }, 'run succeeded');
+      logger.info(
+        { artifacts: uploaded.length, datasets: Object.keys(result.datasets).length },
+        'run succeeded',
+      );
     } catch (err) {
       await storeDiagnostics(pool, storage, runId, err, logger);
       logger.error({ err }, 'run attempt failed');
@@ -175,8 +176,8 @@ async function storeDiagnostics(
 
   try {
     const uploaded = await uploadFailureDiagnostics(storage, runId, diagnostics);
-    for (const { type, put } of uploaded) {
-      await insertArtifact(pool, runId, type, put);
+    for (const { type, put, name, stepIndex } of uploaded) {
+      await insertArtifact(pool, runId, type, put, name, stepIndex);
     }
     logger.info({ artifacts: uploaded.length }, 'stored failure diagnostics');
   } catch (diagnosticErr) {
