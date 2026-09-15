@@ -4,10 +4,12 @@ import { Worker } from 'bullmq';
 import { chromium } from 'playwright';
 import { closePool, getPool } from '@scraper/db';
 import {
+  createLogger,
   getRedisConnection,
   getStorage,
   loadConfig,
   onShutdown,
+  startHealthServer,
   SCRAPE_QUEUE_NAME,
   type ScrapeJobData,
 } from '@scraper/shared';
@@ -16,23 +18,31 @@ import { processRun } from './process-run.js';
 
 export async function startWorker(): Promise<void> {
   const config = loadConfig();
+  const logger = createLogger('worker');
   const pool = getPool(config);
   const storage = getStorage(config);
   await storage.ensureBucket();
 
   const workerId = `${hostname()}-${randomUUID()}`;
   const browsers = createBrowserPool(() => chromium.launch());
+  let activeJobs = 0;
 
   const worker = new Worker<ScrapeJobData>(
     SCRAPE_QUEUE_NAME,
     async (job) => {
-      await processRun(job, {
-        pool,
-        storage,
-        workerId,
-        getBrowser: () => browsers.get(),
-        runTimeoutMs: config.runTimeoutMs,
-      });
+      activeJobs += 1;
+      try {
+        await processRun(job, {
+          pool,
+          storage,
+          workerId,
+          getBrowser: () => browsers.get(),
+          runTimeoutMs: config.runTimeoutMs,
+          logger,
+        });
+      } finally {
+        activeJobs -= 1;
+      }
     },
     {
       connection: getRedisConnection(config),
@@ -43,8 +53,13 @@ export async function startWorker(): Promise<void> {
   );
 
   worker.on('failed', (job, err) => {
-    // eslint-disable-next-line no-console
-    console.error(`job ${job?.id} failed: ${err.message}`);
+    logger.error({ jobId: job?.id, err }, 'job failed');
+  });
+
+  const health = await startHealthServer({
+    port: config.workerHealthPort,
+    details: () => ({ workerId, activeJobs }),
+    logger,
   });
 
   onShutdown(
@@ -52,27 +67,26 @@ export async function startWorker(): Promise<void> {
       // close() drains the active jobs and closes the Redis connection BullMQ owns.
       await worker.close();
       await browsers.close();
+      await health.close();
       await closePool();
     },
     {
       onSignal: (signal) => {
-        // eslint-disable-next-line no-console
-        console.log(`worker ${workerId} received ${signal}, shutting down`);
+        logger.info({ signal }, `worker ${workerId} shutting down`);
       },
     },
   );
 
-  // eslint-disable-next-line no-console
-  console.log(
-    `worker ${workerId} started (concurrency=${config.workerConcurrency}, timeout=${config.runTimeoutMs}ms)`,
+  logger.info(
+    { workerId, concurrency: config.workerConcurrency, healthPort: health.port },
+    'worker started',
   );
 }
 
 const isMain = process.argv[1]?.endsWith('index.js');
 if (isMain) {
   startWorker().catch((err) => {
-    // eslint-disable-next-line no-console
-    console.error(err);
+    createLogger('worker').fatal({ err }, 'worker failed to start');
     process.exit(1);
   });
 }

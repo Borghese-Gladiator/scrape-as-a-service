@@ -5,3 +5,5 @@ export * from './cron.js';
 export * from './queue.js';
 export * from './shutdown.js';
 export * from './storage.js';
+export * from './logger.js';
+export * from './health.js';

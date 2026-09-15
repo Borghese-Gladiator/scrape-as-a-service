@@ -6,6 +6,7 @@ import type {
   StoragePutResult,
 } from '@scraper/shared';
 import { runObjectKey, ScrapeError } from '@scraper/shared';
+import type { ScrapeDiagnostics } from './diagnostics.js';
 
 function csvEscape(value: string | null): string {
   const s = value ?? '';
@@ -42,6 +43,11 @@ interface BuiltArtifact {
   filename: string;
   body: Buffer;
   contentType: string;
+}
+
+export interface UploadedArtifact {
+  type: ArtifactType;
+  put: StoragePutResult;
 }
 
 function buildArtifacts(config: ScrapeConfig, result: ScrapeResult): BuiltArtifact[] {
@@ -99,15 +105,12 @@ function buildArtifacts(config: ScrapeConfig, result: ScrapeResult): BuiltArtifa
   return built;
 }
 
-/** Serialize requested artifacts and upload each to MinIO under runs/<run-id>/. */
-export async function buildAndUploadArtifacts(
+async function uploadAll(
   storage: StorageClient,
   runId: string,
-  config: ScrapeConfig,
-  result: ScrapeResult,
-): Promise<Array<{ type: ArtifactType; put: StoragePutResult }>> {
-  const built = buildArtifacts(config, result);
-  const uploaded: Array<{ type: ArtifactType; put: StoragePutResult }> = [];
+  built: BuiltArtifact[],
+): Promise<UploadedArtifact[]> {
+  const uploaded: UploadedArtifact[] = [];
   for (const artifact of built) {
     const key = runObjectKey(runId, artifact.filename);
     let put: StoragePutResult;
@@ -119,4 +122,52 @@ export async function buildAndUploadArtifacts(
     uploaded.push({ type: artifact.type, put });
   }
   return uploaded;
+}
+
+/** Serialize requested artifacts and upload each to MinIO under runs/<run-id>/. */
+export async function buildAndUploadArtifacts(
+  storage: StorageClient,
+  runId: string,
+  config: ScrapeConfig,
+  result: ScrapeResult,
+): Promise<UploadedArtifact[]> {
+  return uploadAll(storage, runId, buildArtifacts(config, result));
+}
+
+function buildDiagnosticArtifacts(diagnostics: ScrapeDiagnostics): BuiltArtifact[] {
+  const built: BuiltArtifact[] = [];
+  if (diagnostics.screenshot) {
+    built.push({
+      type: 'PNG',
+      filename: 'failure-screenshot.png',
+      body: diagnostics.screenshot,
+      contentType: 'image/png',
+    });
+  }
+  if (diagnostics.html !== undefined) {
+    built.push({
+      type: 'HTML',
+      filename: 'failure-source.html',
+      body: Buffer.from(diagnostics.html, 'utf8'),
+      contentType: 'text/html',
+    });
+  }
+  if (diagnostics.console !== undefined) {
+    built.push({
+      type: 'JSON',
+      filename: 'failure-console.json',
+      body: Buffer.from(JSON.stringify(diagnostics.console, null, 2), 'utf8'),
+      contentType: 'application/json',
+    });
+  }
+  return built;
+}
+
+/** Upload whatever a failed scrape managed to capture, under the same prefix. */
+export async function uploadFailureDiagnostics(
+  storage: StorageClient,
+  runId: string,
+  diagnostics: ScrapeDiagnostics,
+): Promise<UploadedArtifact[]> {
+  return uploadAll(storage, runId, buildDiagnosticArtifacts(diagnostics));
 }

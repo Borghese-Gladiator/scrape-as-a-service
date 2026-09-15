@@ -10,13 +10,16 @@ import {
   type Queryable,
 } from '@scraper/db';
 import {
+  createLogger,
   ScrapeError,
   toErrorCode,
+  type Logger,
   type ScrapeJobData,
   type ScrapeResult,
   type StorageClient,
 } from '@scraper/shared';
-import { buildAndUploadArtifacts } from './artifacts.js';
+import { buildAndUploadArtifacts, uploadFailureDiagnostics } from './artifacts.js';
+import { getDiagnostics } from './diagnostics.js';
 import { closeScrapeSession, openScrapeSession, runScrape } from './scrape.js';
 
 export const HEARTBEAT_INTERVAL_MS = 15_000;
@@ -27,6 +30,7 @@ export interface ProcessRunDeps {
   workerId: string;
   getBrowser: () => Promise<Browser>;
   runTimeoutMs: number;
+  logger?: Logger;
 }
 
 /**
@@ -96,10 +100,16 @@ export async function processRun(
   if (!attempt) {
     throw new Error(`failed to create an attempt for run: ${runId}`);
   }
+  const logger = (deps.logger ?? createLogger('worker')).child({
+    runId,
+    definitionId,
+    attemptId: attempt.id,
+  });
   const running = await updateRunStatus(pool, runId, 'RUNNING', new Date());
   if (!running) {
     throw new Error(`run not found: ${runId}`);
   }
+  logger.info({ attemptNumber: attempt.attempt_number }, 'run started');
 
   const heartbeat = setInterval(() => {
     void touchAttempt(pool, attempt.id).catch(() => {});
@@ -137,10 +147,39 @@ export async function processRun(
 
       await finishAttempt(pool, attempt.id, 'SUCCEEDED');
       await updateRunStatus(pool, runId, 'SUCCEEDED', new Date());
+      logger.info({ artifacts: uploaded.length, rows: result.rows.length }, 'run succeeded');
     } catch (err) {
+      await storeDiagnostics(pool, storage, runId, err, logger);
+      logger.error({ err }, 'run attempt failed');
       return await finalizeFailure(pool, job, attempt.id, err as Error);
     }
   } finally {
     clearInterval(heartbeat);
+  }
+}
+
+/**
+ * Store whatever the failing scrape captured. This runs before finalizeFailure
+ * so the artifacts exist by the time the run reaches FAILED. It never throws:
+ * a diagnostics upload must not replace the error that caused the failure.
+ */
+async function storeDiagnostics(
+  pool: Queryable,
+  storage: StorageClient,
+  runId: string,
+  err: unknown,
+  logger: Logger,
+): Promise<void> {
+  const diagnostics = getDiagnostics(err);
+  if (!diagnostics) return;
+
+  try {
+    const uploaded = await uploadFailureDiagnostics(storage, runId, diagnostics);
+    for (const { type, put } of uploaded) {
+      await insertArtifact(pool, runId, type, put);
+    }
+    logger.info({ artifacts: uploaded.length }, 'stored failure diagnostics');
+  } catch (diagnosticErr) {
+    logger.warn({ err: diagnosticErr }, 'could not store failure diagnostics');
   }
 }

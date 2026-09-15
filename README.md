@@ -40,6 +40,8 @@ Once up:
 | --- | --- |
 | Web UI | http://localhost:3000 |
 | API | http://localhost:4000 |
+| Worker health | http://localhost:4001/health |
+| Scheduler health | http://localhost:4002/health |
 | MinIO console | http://localhost:9001 (user/pass from `.env`) |
 
 Check status and logs:
@@ -47,6 +49,14 @@ Check status and logs:
 ```bash
 docker compose ps
 docker compose logs -f api worker scheduler
+```
+
+Every service has a compose healthcheck, so a crash-looping worker or scheduler
+shows as `unhealthy` in `docker compose ps`. To check all three health endpoints
+from the host in one step:
+
+```bash
+node scripts/manual/phase-6-health.mjs
 ```
 
 ### Scale workers
@@ -58,6 +68,11 @@ horizontally:
 docker compose up -d --scale worker=5
 docker compose ps worker   # 5 replicas
 ```
+
+The `worker` service publishes its health port on the host. Remove that `ports`
+entry from `docker-compose.yml` before you scale beyond one replica, because
+several replicas cannot share one host port. The healthcheck itself runs inside
+the container and keeps working.
 
 Tear down (add `-v` to also drop the postgres/minio volumes):
 
@@ -100,7 +115,9 @@ Then `docker compose build web && docker compose up -d`.
    URL (e.g. `https://example.com`), a row selector / field selectors, and check
    the **JSON**, **CSV**, and **PNG** artifacts. Create it.
 2. On the definition page click **Run**. Open the run from **Run history**: it
-   transitions `QUEUED → RUNNING → SUCCEEDED` with an attempt recorded.
+   transitions `QUEUED → RUNNING → SUCCEEDED` with an attempt recorded. The run
+   page shows a live indicator and refreshes itself every 2 seconds until the
+   run reaches a terminal status. No browser reload is needed.
 3. On a `SUCCEEDED` run, download the JSON / CSV / PNG artifacts. Objects live in
    MinIO under `runs/<run-id>/` (visible in the MinIO console).
 4. **Failure/retry:** create a definition with an unreachable URL
@@ -182,6 +199,24 @@ The API answers a cross-origin request only when the `Origin` header matches
 the URL the UI is served from. The default is `http://localhost:3000`. Use a
 comma to give more than one origin.
 
+## Observability
+
+Every service logs structured JSON through `pino`. Set `LOG_LEVEL` to change the
+level. Output is pretty-printed unless `NODE_ENV=production`.
+
+- **Request ids.** The api tags each request with an id, returns it in the
+  `X-Request-Id` response header, and logs the method, the path, the status and
+  the duration. A caller that sends its own `X-Request-Id` keeps that value.
+- **Run correlation.** Worker log lines for a job carry `runId`, `attemptId` and
+  `definitionId`, so one failed run maps to its own lines.
+- **Health.** The api, the worker and the scheduler each answer `GET /health`.
+  The worker body also reports its id and the number of active jobs.
+- **Failure diagnostics.** When a scrape fails, the worker stores what the page
+  looked like at the point of failure as artifacts of the failed run:
+  `failure-screenshot.png`, `failure-source.html` and `failure-console.json`.
+  Open the failed run in the UI and download them. A capture that fails never
+  changes the original error.
+
 ## Local development (without Docker for the app services)
 
 ```bash
@@ -227,6 +262,9 @@ All configuration is read from the environment (see `.env.example`):
 | `MINIO_ENDPOINT` / `MINIO_PORT` / `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` / `MINIO_BUCKET` / `MINIO_USE_SSL` | Object storage |
 | `API_PORT` / `WEB_PORT` | Service ports |
 | `CORS_ORIGINS` | Comma separated browser origins the API accepts (default `http://localhost:3000`) |
+| `WORKER_HEALTH_PORT` | Port of the worker `/health` server (default `4001`) |
+| `SCHEDULER_HEALTH_PORT` | Port of the scheduler `/health` server (default `4002`) |
+| `LOG_LEVEL` | Log level for every service: `trace`, `debug`, `info`, `warn`, `error`, `fatal` or `silent` (default `info`) |
 | `SCHEDULER_INTERVAL_MS` | Scheduler poll interval |
 | `WORKER_CONCURRENCY` | Worker job concurrency |
 | `RUN_TIMEOUT_MS` | Hard limit on one scrape, in milliseconds (default `120000`) |

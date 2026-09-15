@@ -12,6 +12,8 @@ export interface AppConfig {
   apiPort: number;
   webPort: number;
   corsOrigins: string[];
+  workerHealthPort: number;
+  schedulerHealthPort: number;
   schedulerIntervalMs: number;
   workerConcurrency: number;
   runTimeoutMs: number;
@@ -68,6 +70,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webPort: toInt(optional(env, 'WEB_PORT', '3000'), 'WEB_PORT'),
     corsOrigins: toOriginList(
       optional(env, 'CORS_ORIGINS', DEFAULT_CORS_ORIGINS.join(',')),
+    ),
+    workerHealthPort: toInt(optional(env, 'WORKER_HEALTH_PORT', '4001'), 'WORKER_HEALTH_PORT'),
+    schedulerHealthPort: toInt(
+      optional(env, 'SCHEDULER_HEALTH_PORT', '4002'),
+      'SCHEDULER_HEALTH_PORT',
     ),
     schedulerIntervalMs: toInt(optional(env, 'SCHEDULER_INTERVAL_MS', '10000'), 'SCHEDULER_INTERVAL_MS'),
     workerConcurrency: toInt(optional(env, 'WORKER_CONCURRENCY', '4'), 'WORKER_CONCURRENCY'),
