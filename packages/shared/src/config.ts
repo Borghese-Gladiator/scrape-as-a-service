@@ -11,6 +11,7 @@ export interface AppConfig {
   };
   apiPort: number;
   webPort: number;
+  corsOrigins: string[];
   schedulerIntervalMs: number;
   workerConcurrency: number;
 }
@@ -40,6 +41,15 @@ function toBool(value: string): boolean {
   return value === 'true' || value === '1';
 }
 
+export const DEFAULT_CORS_ORIGINS = ['http://localhost:3000'];
+
+function toOriginList(value: string): string[] {
+  return value
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
     databaseUrl: required(env, 'DATABASE_URL'),
@@ -54,6 +64,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     apiPort: toInt(optional(env, 'API_PORT', '4000'), 'API_PORT'),
     webPort: toInt(optional(env, 'WEB_PORT', '3000'), 'WEB_PORT'),
+    corsOrigins: toOriginList(
+      optional(env, 'CORS_ORIGINS', DEFAULT_CORS_ORIGINS.join(',')),
+    ),
     schedulerIntervalMs: toInt(optional(env, 'SCHEDULER_INTERVAL_MS', '10000'), 'SCHEDULER_INTERVAL_MS'),
     workerConcurrency: toInt(optional(env, 'WORKER_CONCURRENCY', '4'), 'WORKER_CONCURRENCY'),
   };

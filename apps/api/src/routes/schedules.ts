@@ -56,6 +56,9 @@ export function schedulesRouter(pool: Pool): Router {
         { definitionId, cron, timezone, enabled },
         nextRunAt,
       );
+      if (!schedule) {
+        throw new HttpError(500, 'failed to create the schedule');
+      }
       res.status(201).json(schedule);
     }),
   );

@@ -12,7 +12,7 @@ export async function insertAttempt(
   db: Queryable,
   runId: string,
   workerId: string,
-): Promise<ScrapeRunAttempt> {
+): Promise<ScrapeRunAttempt | null> {
   const { rows } = await db.query<ScrapeRunAttempt>(
     `INSERT INTO scrape_run_attempts (run_id, attempt_number, status, worker_id)
      VALUES (
@@ -25,7 +25,7 @@ export async function insertAttempt(
      RETURNING ${COLUMNS}`,
     [runId, workerId],
   );
-  return rows[0]!;
+  return rows[0] ?? null;
 }
 
 export async function finishAttempt(
@@ -33,7 +33,7 @@ export async function finishAttempt(
   id: string,
   status: AttemptStatus,
   error?: { code: string; message: string },
-): Promise<ScrapeRunAttempt> {
+): Promise<ScrapeRunAttempt | null> {
   const { rows } = await db.query<ScrapeRunAttempt>(
     `UPDATE scrape_run_attempts
      SET status = $2,
@@ -44,7 +44,7 @@ export async function finishAttempt(
      RETURNING ${COLUMNS}`,
     [id, status, error?.code ?? null, error?.message ?? null],
   );
-  return rows[0]!;
+  return rows[0] ?? null;
 }
 
 export async function listAttempts(

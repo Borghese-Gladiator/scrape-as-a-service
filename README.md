@@ -65,6 +65,11 @@ Tear down (add `-v` to also drop the postgres/minio volumes):
 docker compose down
 ```
 
+The worker and the scheduler handle `SIGTERM` and `SIGINT`. On a stop the worker
+drains the jobs it holds, closes any open browser, and closes its Postgres pool
+and Redis connection. The scheduler finishes the poll it is in and closes the
+same resources. Both give up after 15 seconds and exit anyway.
+
 ### Port conflicts
 
 Host ports are configurable in `.env` so the stack can coexist with other local
@@ -83,6 +88,8 @@ REDIS_PORT=56379
 # must match the remapped API_PORT — rebuild web after changing it.
 NEXT_PUBLIC_API_BASE_URL=http://localhost:54000
 API_BASE_URL=http://localhost:54000
+# The browser posts from the remapped WEB_PORT, so the API must allow that origin.
+CORS_ORIGINS=http://localhost:53000
 ```
 
 Then `docker compose build web && docker compose up -d`.
@@ -103,6 +110,41 @@ Then `docker compose build web && docker compose up -d`.
 5. **Schedule:** on a definition, add a cron schedule (with timezone) and enable
    it. When it comes due the `scheduler` creates a `SCHEDULE`-triggered run that
    the worker picks up.
+
+## API
+
+| Route | Purpose |
+| --- | --- |
+| `GET /health` | Liveness probe |
+| `GET /definitions` | List every definition |
+| `POST /definitions` | Create a definition (`name`, `url`, `config`) |
+| `GET /schedules` | List schedules, optionally `?definitionId=` |
+| `POST /schedules` | Create a schedule (`definitionId`, `cron`, `timezone`, `enabled`) |
+| `PATCH /schedules/:id` | Enable or disable a schedule (`enabled`) |
+| `GET /runs` | List runs, optionally `?definitionId=` |
+| `GET /runs/:id` | Read one run with its attempts and artifacts |
+| `POST /runs` | Trigger a run |
+| `GET /runs/:runId/artifacts` | List the artifacts of a run |
+| `GET /artifacts/:id/download` | Download one artifact |
+
+### `POST /runs`
+
+```json
+{ "definitionId": "<uuid>", "trigger": "API" }
+```
+
+`definitionId` is required. `trigger` is optional. The accepted values are
+`MANUAL` and `API`, and the default is `MANUAL`. Any other value answers 400.
+The scheduler writes the third trigger, `SCHEDULE`, so the API rejects it.
+
+The response is the new run with status `QUEUED`.
+
+### Browser access
+
+The API answers a cross-origin request only when the `Origin` header matches
+`CORS_ORIGINS`. The web UI posts from the browser, so `CORS_ORIGINS` must list
+the URL the UI is served from. The default is `http://localhost:3000`. Use a
+comma to give more than one origin.
 
 ## Local development (without Docker for the app services)
 
@@ -148,6 +190,7 @@ All configuration is read from the environment (see `.env.example`):
 | `REDIS_URL` | Redis connection for BullMQ |
 | `MINIO_ENDPOINT` / `MINIO_PORT` / `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` / `MINIO_BUCKET` / `MINIO_USE_SSL` | Object storage |
 | `API_PORT` / `WEB_PORT` | Service ports |
+| `CORS_ORIGINS` | Comma separated browser origins the API accepts (default `http://localhost:3000`) |
 | `SCHEDULER_INTERVAL_MS` | Scheduler poll interval |
 | `WORKER_CONCURRENCY` | Worker job concurrency |
 | `NEXT_PUBLIC_API_BASE_URL` | Base URL the web frontend uses to reach the `api` service (falls back to `API_BASE_URL`, then `http://localhost:4000`) |

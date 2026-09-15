@@ -1,8 +1,10 @@
+import cors from 'cors';
 import express, { type Express } from 'express';
 import type { Pool } from 'pg';
 import type { Queue } from 'bullmq';
 import { getPool, runMigrations } from '@scraper/db';
 import {
+  DEFAULT_CORS_ORIGINS,
   getQueue,
   getStorage,
   loadConfig,
@@ -19,8 +21,10 @@ export function createServer(
   pool: Pool,
   queue: Queue<ScrapeJobData>,
   storage: StorageClient,
+  corsOrigins: string[] = DEFAULT_CORS_ORIGINS,
 ): Express {
   const app = express();
+  app.use(cors({ origin: corsOrigins }));
   app.use(express.json());
 
   app.get('/health', (_req, res) => {
@@ -45,7 +49,7 @@ export async function startApi(): Promise<void> {
   await storage.ensureBucket();
 
   const queue = getQueue(config);
-  const app = createServer(pool, queue, storage);
+  const app = createServer(pool, queue, storage, config.corsOrigins);
 
   app.listen(config.apiPort, () => {
     // eslint-disable-next-line no-console

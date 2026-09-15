@@ -54,21 +54,27 @@ describe('POST /runs (manual trigger)', () => {
     );
   });
 
-  it('uses trigger API on the api-trigger path', async () => {
+  it('records the API trigger when the body asks for it', async () => {
     const queue = { add: vi.fn(async () => ({})) } as unknown as Queue<ScrapeJobData>;
     const app = createServer(fakePool(), queue, storage);
 
-    const res = await request(app).post('/runs/api-trigger').send({ definitionId: 'def-1' });
+    const res = await request(app)
+      .post('/runs')
+      .send({ definitionId: 'def-1', trigger: 'API' });
 
     expect(res.status).toBe(201);
     expect(res.body.trigger).toBe('API');
   });
 
-  it('returns 400 when definitionId is missing', async () => {
+  it.each([
+    { desc: 'definitionId is missing', body: {} },
+    { desc: 'the trigger is unknown', body: { definitionId: 'def-1', trigger: 'CRON' } },
+    { desc: 'the trigger is SCHEDULE', body: { definitionId: 'def-1', trigger: 'SCHEDULE' } },
+  ])('returns 400 when $desc', async ({ body }) => {
     const queue = { add: vi.fn() } as unknown as Queue<ScrapeJobData>;
     const app = createServer(fakePool(), queue, storage);
 
-    const res = await request(app).post('/runs').send({});
+    const res = await request(app).post('/runs').send(body);
 
     expect(res.status).toBe(400);
     expect(queue.add).not.toHaveBeenCalled();

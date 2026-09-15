@@ -71,6 +71,7 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET:-scraper-artifacts}
       MINIO_USE_SSL: "false"
       API_PORT: "4000"
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
     ports:
       - "${API_PORT:-4000}:4000"
     depends_on:

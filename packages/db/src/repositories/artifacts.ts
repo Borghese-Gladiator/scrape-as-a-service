@@ -9,14 +9,14 @@ export async function insertArtifact(
   runId: string,
   type: ArtifactType,
   put: StoragePutResult,
-): Promise<Artifact> {
+): Promise<Artifact | null> {
   const { rows } = await db.query<Artifact>(
     `INSERT INTO artifacts (run_id, type, object_key, content_type, size_bytes)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING ${COLUMNS}`,
     [runId, type, put.objectKey, put.contentType, put.sizeBytes],
   );
-  return rows[0]!;
+  return rows[0] ?? null;
 }
 
 export async function listArtifacts(db: Queryable, runId: string): Promise<Artifact[]> {
