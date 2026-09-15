@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import type { Pool } from 'pg';
 import { createDefinition, listDefinitions } from '@scraper/db';
-import { validateScrapeConfig } from '@scraper/shared';
+import { assertSafeUrl, validateScrapeConfig } from '@scraper/shared';
 import { asyncHandler, HttpError } from '../http.js';
 
-export function definitionsRouter(pool: Pool): Router {
+export type AssertUrl = (url: string) => Promise<void>;
+
+export function definitionsRouter(pool: Pool, assertUrl: AssertUrl = assertSafeUrl): Router {
   const router = Router();
 
   router.get(
@@ -25,6 +27,11 @@ export function definitionsRouter(pool: Pool): Router {
       }
       if (typeof url !== 'string' || url.length === 0) {
         throw new HttpError(400, 'url is required');
+      }
+      try {
+        await assertUrl(url);
+      } catch (err) {
+        throw new HttpError(400, (err as Error).message);
       }
       let config;
       try {

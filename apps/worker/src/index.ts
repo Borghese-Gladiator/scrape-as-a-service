@@ -39,6 +39,8 @@ export async function startWorker(): Promise<void> {
           getBrowser: () => browsers.get(),
           runTimeoutMs: config.runTimeoutMs,
           logger,
+          allowCdp: config.allowCdp,
+          allowLocalProfile: config.allowLocalProfile,
         });
       } finally {
         activeJobs -= 1;

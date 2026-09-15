@@ -33,6 +33,11 @@ CSS selectors, capture the entry page. See `apps/worker/src/scrape.ts` and
 `packages/shared/src/scrape-config.ts`.
 
 ### 1.1 No session, cookies, or credentials — P0
+
+**DONE (phase 4)** — `AuthConfig` has five modes: `none`, `storageState`, `cdp`,
+`chromeProfile` and `login`. `runScrape` builds the context that the mode asks
+for. `cdp` and `chromeProfile` are local-worker modes behind `ALLOW_CDP` and
+`ALLOW_LOCAL_PROFILE`. Credentials live in the secret store (3.3).
 `runScrape` calls `browser.newContext()` with an empty state
 (`apps/worker/src/scrape.ts:26`). There is no way to supply cookies, a Playwright
 `storageState`, HTTP basic auth, a bearer header, or a login step. Every
@@ -223,11 +228,22 @@ front, so streaming requires a different MinIO call.
 ## 3. Security
 
 ### 3.1 No authentication or authorization anywhere — P1
+
+**DONE (phase 4)** — Every route except `/health` needs `X-API-Key` to match
+`API_KEY`, through a timing-safe comparison. An empty `API_KEY` stops the API
+from starting in production and logs a warning anywhere else. There is still no
+user model and no tenancy; a single shared key is the whole model.
 The API is fully open. Anyone who can reach port 4000 can list every definition,
 create definitions, and trigger runs. There is no API key, no session, no user
 model, and no tenancy. Combined with 3.2 this is the most serious gap.
 
 ### 3.2 Server-side request forgery through the definition URL — P1
+
+**DONE (phase 4)** — `assertSafeUrl` allows `http` and `https` only, resolves
+the host, and rejects every non-global address. It runs in `POST /definitions`
+and in the worker on every `goto` and `openLink` target plus the URL the page
+landed on, so a redirect cannot escape it. `ALLOW_PRIVATE_URLS=true` is the
+bypass. An allowlist is still open.
 `POST /definitions` accepts any `url` string
 (`apps/api/src/routes/definitions.ts:24`) and the worker navigates to it with a
 real browser. Nothing validates the scheme or the host. A caller can point a run
@@ -238,11 +254,22 @@ Fix: enforce `http`/`https`, resolve the host and reject private and
 link-local ranges, and offer an allowlist.
 
 ### 3.3 Credentials will need a secret store — P1
+
+**DONE (phase 4)** — The `secrets` table holds a name and an AES-256-GCM
+ciphertext under `SECRET_ENCRYPTION_KEY`. `POST /secrets`, `GET /secrets` and
+`DELETE /secrets/:id` manage it. The API never returns a plaintext value and
+never returns a ciphertext; only the worker decrypts. A config carries a secret
+name, never a value, so `GET /definitions` stays safe.
 Once 1.1 lands, cookies and passwords live in the definition. `config` is a
 plain JSONB column and the API returns definitions in full. Secrets must be
 stored separately, encrypted, and never returned by `GET /definitions`.
 
 ### 3.4 Artifact downloads are unauthenticated — P1
+
+**DONE (phase 4)** — `GET /artifacts/:id/download` sits behind the API key like
+every other route, and the stream stays. `GET /artifacts/:id/url` returns a
+15-minute presigned URL through `presignedGetUrl`, which the run detail page
+uses because a browser cannot put a header on a link.
 `GET /artifacts/:id/download` streams any artifact to any caller who knows the
 UUID. `presignedGetUrl` exists on the storage client but is never used.
 

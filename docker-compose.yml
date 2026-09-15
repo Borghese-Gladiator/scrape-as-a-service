@@ -73,6 +73,9 @@ services:
       API_PORT: "4000"
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      API_KEY: ${API_KEY:-}
+      SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
+      ALLOW_PRIVATE_URLS: ${ALLOW_PRIVATE_URLS:-false}
     ports:
       - "${API_PORT:-4000}:4000"
     depends_on:
@@ -105,6 +108,12 @@ services:
       RUN_TIMEOUT_MS: ${RUN_TIMEOUT_MS:-120000}
       WORKER_HEALTH_PORT: "4001"
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
+      ALLOW_PRIVATE_URLS: ${ALLOW_PRIVATE_URLS:-false}
+      # auth.mode=cdp and auth.mode=chromeProfile need a local worker, not this
+      # container: neither can reach the host browser or the host disk.
+      ALLOW_CDP: "false"
+      ALLOW_LOCAL_PROFILE: "false"
     # Remove this mapping before `--scale worker=N`: a fixed host port cannot be
     # shared by several replicas. The healthcheck below runs inside the container
     # and does not need it.
@@ -164,9 +173,12 @@ services:
       args:
         # Baked into the browser bundle; must be reachable from the host.
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:4000}
+        # Baked into the browser bundle, so anybody who loads the page can read it.
+        NEXT_PUBLIC_API_KEY: ${NEXT_PUBLIC_API_KEY:-}
     environment:
       # Used by server-side rendering inside the container to reach the api service.
       API_BASE_URL: http://api:4000
+      API_KEY: ${API_KEY:-}
       # Next.js standalone server reads PORT/HOSTNAME.
       PORT: "3000"
       HOSTNAME: "0.0.0.0"

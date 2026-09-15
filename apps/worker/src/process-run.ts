@@ -7,6 +7,7 @@ import {
   insertAttempt,
   touchAttempt,
   updateRunStatus,
+  upsertSecret,
   type Queryable,
 } from '@scraper/db';
 import {
@@ -14,6 +15,8 @@ import {
   ScrapeError,
   toErrorCode,
   validateScrapeConfig,
+  collectSecretRefs,
+  encryptSecret,
   type Logger,
   type ScrapeJobData,
   type StorageClient,
@@ -22,6 +25,7 @@ import { buildAndUploadArtifacts, uploadFailureDiagnostics } from './artifacts.j
 import { getDiagnostics } from './diagnostics.js';
 import type { ScrapeResult } from './interpreter.js';
 import { closeScrapeSession, openScrapeSession, runScrape } from './scrape.js';
+import { loadSecrets } from './secrets.js';
 
 export const HEARTBEAT_INTERVAL_MS = 15_000;
 
@@ -32,6 +36,8 @@ export interface ProcessRunDeps {
   getBrowser: () => Promise<Browser>;
   runTimeoutMs: number;
   logger?: Logger;
+  allowCdp?: boolean;
+  allowLocalProfile?: boolean;
 }
 
 /**
@@ -125,13 +131,22 @@ export async function processRun(
       }
       // A definition stored before Phase 2 still holds a v1 config; upgrade it.
       const config = validateScrapeConfig(definition.config);
+      // Secrets are resolved here and nowhere else: only the worker decrypts.
+      const secrets = await loadSecrets(pool, collectSecretRefs(config));
 
       const browser = await getBrowser();
-      const session = await openScrapeSession(browser, config);
+      const session = await openScrapeSession(browser, definition.url, config, {
+        secrets,
+        allowCdp: deps.allowCdp ?? false,
+        allowLocalProfile: deps.allowLocalProfile ?? false,
+        saveSecret: async (name, value) => {
+          await upsertSecret(pool, name, encryptSecret(value));
+        },
+      });
       let result: ScrapeResult;
       try {
         result = await withRunTimeout(
-          runScrape(session, definition.url, config),
+          runScrape(session, definition.url, config, { secrets }),
           runTimeoutMs,
         );
       } finally {

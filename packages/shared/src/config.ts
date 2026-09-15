@@ -18,6 +18,11 @@ export interface AppConfig {
   workerConcurrency: number;
   runTimeoutMs: number;
   staleAttemptMinutes: number;
+  /** Empty means the API key check is off. `startApi` refuses that in production. */
+  apiKey: string;
+  allowCdp: boolean;
+  allowLocalProfile: boolean;
+  allowPrivateUrls: boolean;
 }
 
 function required(env: NodeJS.ProcessEnv, key: string): string {
@@ -83,5 +88,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       optional(env, 'STALE_ATTEMPT_MINUTES', '10'),
       'STALE_ATTEMPT_MINUTES',
     ),
+    apiKey: optional(env, 'API_KEY', ''),
+    allowCdp: toBool(optional(env, 'ALLOW_CDP', 'false')),
+    allowLocalProfile: toBool(optional(env, 'ALLOW_LOCAL_PROFILE', 'false')),
+    allowPrivateUrls: toBool(optional(env, 'ALLOW_PRIVATE_URLS', 'false')),
   };
 }
