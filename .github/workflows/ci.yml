@@ -19,14 +19,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
       - name: Typecheck
         run: npm run typecheck
 
       - name: Typecheck the web app
         run: npm run check-types --workspace @scraper/web
+
+      # Type-aware lint rules need packages/db and packages/shared already
+      # built (tsc -b, above), or they cannot resolve @scraper/db and
+      # @scraper/shared types and misreport unrelated unsafe-* errors.
+      - name: Lint
+        run: npm run lint
 
       - name: Unit tests
         run: npm test
