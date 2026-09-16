@@ -1,86 +1,210 @@
-name: "scrape_as_a_service"
 services:
-  #==================
-  #   KAFKA
-  #==================
-  # Ingestion pipeline
-  kafka:
-    image: bitnami/kafka:latest
-    container_name: kafka
+  postgres:
+    image: postgres:16-alpine
     environment:
-      - KAFKA_ENABLE_KRAFT=yes
-      - KAFKA_CFG_NODE_ID=1
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
-      
-      # Listener setup
-      - KAFKA_CFG_LISTENERS=INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://kafka:29092,EXTERNAL://localhost:9092
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=INTERNAL
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - ALLOW_PLAINTEXT_LISTENER=yes
-    ports:
-      - "9092:9092"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-scraper}
     volumes:
-      - kafka_data:/bitnami/kafka
-    networks:
-      - app_network
-  
-  kafdrop:
-    image: obsidiandynamics/kafdrop
-    container_name: kafdrop
-    restart: always
+      - pgdata:/var/lib/postgresql/data
     ports:
-      # Minio also uses 9000 by default
-      - "9000:9000"
-    environment:
-      KAFKA_BROKERCONNECT: kafka:29092
-    networks:
-      - app_network
-  
-  #==================
-  #   REDIS
-  #==================
-  # Ingestion Pipeline AND Scrape Completion notifications
+      - '${POSTGRES_PORT:-5432}:5432'
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-scraper}',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redis:
-    image: redis:7
+    image: redis:7-alpine
     ports:
-      - "6379:6379"
-    networks:
-      - app_network
-  redis-insight:
-    image: redis/redisinsight:latest
-    restart: always
-    ports:
-      - "5540:5540"
-    volumes:
-      - redis-insight:/data
-    networks:
-      - app_network
-    # NOTE: add Redis Database | "Connection Settings" | update Host to "redis" to connect to Redis container instead of host machine
-  
-  #==================
-  #   MINIO
-  #==================
+      - '${REDIS_PORT:-6379}:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   minio:
-    image: minio/minio
-    container_name: minio
-    ports:
-      - "9002:9002"  # API
-      - "9003:9003"  # Console
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
     volumes:
-      - minio-data:/data
-    command: server --console-address ":9003" /data
+      - miniodata:/data
+    ports:
+      - '${MINIO_PORT:-9000}:9000'
+      - '${MINIO_CONSOLE_PORT:-9001}:9001'
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: create the artifacts bucket. The api/worker also call ensureBucket()
+  # on boot, so this is a convenience that guarantees the bucket + console listing.
+  minio-bootstrap:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY:-minioadmin} ${MINIO_SECRET_KEY:-minioadmin} &&
+      mc mb --ignore-existing local/${MINIO_BUCKET:-scraper-artifacts} &&
+      echo 'bucket ready: ${MINIO_BUCKET:-scraper-artifacts}'
+      "
+    restart: 'no'
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-scraper}
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: '9000'
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-scraper-artifacts}
+      MINIO_USE_SSL: 'false'
+      API_PORT: '4000'
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      API_KEY: ${API_KEY:-}
+      SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
+      ALLOW_PRIVATE_URLS: ${ALLOW_PRIVATE_URLS:-false}
+    ports:
+      - '${API_PORT:-4000}:4000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'node -e "fetch(''http://localhost:4000/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-scraper}
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: '9000'
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-scraper-artifacts}
+      MINIO_USE_SSL: 'false'
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      RUN_TIMEOUT_MS: ${RUN_TIMEOUT_MS:-120000}
+      WORKER_HEALTH_PORT: '4001'
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
+      ALLOW_PRIVATE_URLS: ${ALLOW_PRIVATE_URLS:-false}
+      # auth.mode=cdp and auth.mode=chromeProfile need a local worker, not this
+      # container: neither can reach the host browser or the host disk.
+      ALLOW_CDP: 'false'
+      ALLOW_LOCAL_PROFILE: 'false'
+    # Remove this mapping before `--scale worker=N`: a fixed host port cannot be
+    # shared by several replicas. The healthcheck below runs inside the container
+    # and does not need it.
+    ports:
+      - '${WORKER_HEALTH_PORT:-4001}:4001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'node -e "fetch(''http://localhost:4001/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: apps/scheduler/Dockerfile
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-scraper}
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: '9000'
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-scraper-artifacts}
+      MINIO_USE_SSL: 'false'
+      SCHEDULER_INTERVAL_MS: ${SCHEDULER_INTERVAL_MS:-10000}
+      STALE_ATTEMPT_MINUTES: ${STALE_ATTEMPT_MINUTES:-10}
+      SCHEDULER_HEALTH_PORT: '4002'
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      RETENTION_DAYS: ${RETENTION_DAYS:-30}
+    ports:
+      - '${SCHEDULER_HEALTH_PORT:-4002}:4002'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'node -e "fetch(''http://localhost:4002/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Baked into the browser bundle; must be reachable from the host.
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:4000}
+        # Baked into the browser bundle, so anybody who loads the page can read it.
+        NEXT_PUBLIC_API_KEY: ${NEXT_PUBLIC_API_KEY:-}
+    environment:
+      # Used by server-side rendering inside the container to reach the api service.
+      API_BASE_URL: http://api:4000
+      API_KEY: ${API_KEY:-}
+      # Next.js standalone server reads PORT/HOSTNAME.
+      PORT: '3000'
+      HOSTNAME: '0.0.0.0'
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
-  kafka_data:
-  minio-data:
-  redis-insight:
-
-networks:
-  app_network:
-    driver: bridge
+  pgdata:
+  miniodata:

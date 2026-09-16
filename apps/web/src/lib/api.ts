@@ -1,0 +1,166 @@
+import type {
+  ApiClient,
+  Artifact,
+  CreateDefinitionInput,
+  CreateScheduleInput,
+  Page,
+  RunDetail,
+  ScrapeDefinition,
+  ScrapeRun,
+  ScrapeSchedule,
+  UpdateDefinitionInput,
+} from './types';
+
+const DEFAULT_BASE_URL = 'http://localhost:4000';
+
+function resolveBaseUrl(explicit?: string): string {
+  if (explicit && explicit.length > 0) return explicit.replace(/\/$/, '');
+
+  const publicUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+  // Server-side (SSR/RSC) requests run inside the web container and must reach
+  // the api service over the internal Docker network. API_BASE_URL is a
+  // server-only, non-inlined var (e.g. http://api:4000). In the browser we use
+  // the public, host-reachable URL (e.g. http://localhost:4000).
+  if (typeof window === 'undefined') {
+    const internal = process.env.API_BASE_URL;
+    const chosen = internal || publicUrl || DEFAULT_BASE_URL;
+    return chosen.replace(/\/$/, '');
+  }
+
+  return (publicUrl && publicUrl.length > 0 ? publicUrl : DEFAULT_BASE_URL).replace(/\/$/, '');
+}
+
+/**
+ * Always the browser-reachable base URL. Used for links/URLs that are rendered
+ * into the page (e.g. artifact download hrefs) — these are followed by the
+ * browser even when produced during server-side rendering, so they must never
+ * use the internal Docker network address.
+ */
+function resolvePublicBaseUrl(explicit?: string): string {
+  if (explicit && explicit.length > 0) return explicit.replace(/\/$/, '');
+  const publicUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  return (publicUrl && publicUrl.length > 0 ? publicUrl : DEFAULT_BASE_URL).replace(/\/$/, '');
+}
+
+/**
+ * The API needs `X-API-Key` on every route except `/health`. Server-side calls
+ * read the server-only `API_KEY`. The browser has no way to read that, so it
+ * falls back to `NEXT_PUBLIC_API_KEY`, which is baked into the bundle and is
+ * therefore visible to anybody who loads the page. See the README.
+ */
+function apiKeyHeader(): Record<string, string> {
+  const key =
+    typeof window === 'undefined'
+      ? (process.env.API_KEY ?? process.env.NEXT_PUBLIC_API_KEY)
+      : process.env.NEXT_PUBLIC_API_KEY;
+  return key && key.length > 0 ? { 'X-API-Key': key } : {};
+}
+
+async function send(url: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(url, {
+    cache: 'no-store',
+    headers: {
+      'Content-Type': 'application/json',
+      ...apiKeyHeader(),
+      ...(init?.headers ?? {}),
+    },
+    ...init,
+  });
+  if (!res.ok) {
+    let message = `Request failed (${res.status})`;
+    try {
+      const body = (await res.json()) as { error?: string; message?: string };
+      message = body.error ?? body.message ?? message;
+    } catch {
+      // response had no JSON body
+    }
+    throw new Error(message);
+  }
+  return res;
+}
+
+async function request<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await send(url, init);
+  return (await res.json()) as T;
+}
+
+/** `DELETE` answers `204 No Content`, so there is no body to parse. */
+async function requestVoid(url: string, init?: RequestInit): Promise<void> {
+  await send(url, init);
+}
+
+export function getApiClient(baseUrl?: string): ApiClient {
+  const base = resolveBaseUrl(baseUrl);
+  const publicBase = resolvePublicBaseUrl(baseUrl);
+
+  return {
+    async listDefinitions() {
+      const page = await request<Page<ScrapeDefinition>>(`${base}/definitions`);
+      return page.items;
+    },
+    getDefinition(id: string) {
+      return request<ScrapeDefinition>(`${base}/definitions/${encodeURIComponent(id)}`);
+    },
+    createDefinition(input: CreateDefinitionInput) {
+      return request<ScrapeDefinition>(`${base}/definitions`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+    updateDefinition(id: string, input: UpdateDefinitionInput) {
+      return request<ScrapeDefinition>(`${base}/definitions/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      });
+    },
+    deleteDefinition(id: string) {
+      return requestVoid(`${base}/definitions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    },
+    listSchedules(definitionId?: string) {
+      const query = definitionId ? `?definitionId=${encodeURIComponent(definitionId)}` : '';
+      return request<ScrapeSchedule[]>(`${base}/schedules${query}`);
+    },
+    createSchedule(input: CreateScheduleInput) {
+      return request<ScrapeSchedule>(`${base}/schedules`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+    toggleSchedule(id: string, enabled: boolean) {
+      return request<ScrapeSchedule>(`${base}/schedules/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ enabled }),
+      });
+    },
+    triggerRun(definitionId: string) {
+      return request<ScrapeRun>(`${base}/runs`, {
+        method: 'POST',
+        body: JSON.stringify({ definitionId }),
+      });
+    },
+    async listRuns(definitionId?: string) {
+      const query = definitionId ? `?definitionId=${encodeURIComponent(definitionId)}` : '';
+      const page = await request<Page<ScrapeRun>>(`${base}/runs${query}`);
+      return page.items;
+    },
+    getRun(id: string) {
+      return request<RunDetail>(`${base}/runs/${encodeURIComponent(id)}`);
+    },
+    listArtifacts(runId: string) {
+      return request<Artifact[]>(`${base}/runs/${encodeURIComponent(runId)}/artifacts`);
+    },
+    artifactDownloadUrl(artifactId: string) {
+      return `${publicBase}/artifacts/${encodeURIComponent(artifactId)}/download`;
+    },
+    async artifactPresignedUrl(artifactId: string) {
+      const body = await request<{ url: string }>(
+        `${base}/artifacts/${encodeURIComponent(artifactId)}/url`,
+      );
+      return body.url;
+    },
+    runArchiveUrl(runId: string) {
+      return `${publicBase}/runs/${encodeURIComponent(runId)}/artifacts.zip`;
+    },
+  };
+}

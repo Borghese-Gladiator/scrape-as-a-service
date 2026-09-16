@@ -1,0 +1,18 @@
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+.next/
+out/
+coverage/
+.env
+.env.local
+.env.*.local
+playwright-report/
+test-results/
+.DS_Store
+*.log
+
+# Phase 9: the receipts job and the discovery report write here.
+exports/
+discovery-report.json
