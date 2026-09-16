@@ -267,23 +267,17 @@ function parseLimits(input: unknown, path: string): Limits {
 
 function parseConfig(input: unknown): ScrapeConfig {
   if (!isRecord(input)) fail('Scrape config must be an object');
-  if (input.version !== 2) fail('version must be 2');
   if (!Array.isArray(input.steps) || input.steps.length === 0) {
     fail('steps must be a non-empty array');
   }
 
   const config: ScrapeConfig = {
-    version: 2,
     steps: input.steps.map((step, index) => parseStep(step, `steps[${index}]`)),
   };
   if (input.auth !== undefined) config.auth = parseAuth(input.auth, 'auth');
   if (input.limits !== undefined) config.limits = parseLimits(input.limits, 'limits');
   const record = optionalBoolean(input.record, 'record');
   if (record !== undefined) config.record = record;
-  if (input.upgradedFrom !== undefined) {
-    if (input.upgradedFrom !== 1) fail('upgradedFrom must be 1 when provided');
-    config.upgradedFrom = 1;
-  }
   return config;
 }
 

@@ -34,7 +34,6 @@ interface AttemptRow extends QueryResultRow {
 }
 
 const DEF_CONFIG: ScrapeConfig = {
-  version: 2,
   steps: [
     { op: 'goto' },
     { op: 'extract', name: 'rows', fields: [{ name: 'title', selector: 'h1' }] },

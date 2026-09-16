@@ -153,7 +153,7 @@ export async function processRun(
         await closeScrapeSession(session);
       }
 
-      const uploaded = await buildAndUploadArtifacts(storage, runId, config, result);
+      const uploaded = await buildAndUploadArtifacts(storage, runId, result);
       for (const { type, put, name, stepIndex } of uploaded) {
         await insertArtifact(pool, runId, type, put, name, stepIndex);
       }

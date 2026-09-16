@@ -11,14 +11,6 @@ export const ARTIFACT_TYPES: readonly ArtifactType[] = [
   'PDF',
 ];
 
-export const V1_ARTIFACT_TYPES: readonly ArtifactType[] = [
-  'JSON',
-  'CSV',
-  'PNG',
-  'HTML',
-  'WEBM',
-];
-
 export const CAPTURE_TYPES: readonly CaptureType[] = ['PNG', 'PDF', 'HTML'];
 
 const WAIT_UNTIL_VALUES: readonly WaitUntil[] = [
@@ -102,22 +94,11 @@ export type Step =
   | { op: 'goBack' };
 
 export interface ScrapeConfig {
-  version: 2;
   auth?: AuthConfig;
   steps: Step[];
   limits?: Limits;
-  /** Record the whole browser context as WEBM. A v1 `artifacts: ['WEBM']` sets it. */
+  /** Record the whole browser context as WEBM. */
   record?: boolean;
-  /** Set by `upgradeScrapeConfig`. It makes the worker keep the v1 artifact filenames. */
-  upgradedFrom?: 1;
-}
-
-/** The v1 config shape. `validateScrapeConfig` still accepts it and upgrades it. */
-export interface ScrapeConfigV1 {
-  waitFor?: string;
-  rowSelector?: string;
-  fields: ScrapeFieldSelector[];
-  artifacts: ArtifactType[];
 }
 
 export class ScrapeConfigError extends Error {
@@ -411,90 +392,23 @@ function parseLimits(input: unknown, path: string): Limits {
   return limits;
 }
 
-/** True when the input carries no `version` key, which marks it as the v1 shape. */
-export function isV1Config(input: unknown): boolean {
-  return isRecord(input) && input.version === undefined;
-}
-
-function parseV1(input: unknown): ScrapeConfigV1 {
-  if (!isRecord(input)) fail('Scrape config must be an object');
-  const waitFor = optionalString(input.waitFor, 'waitFor');
-  const rowSelector = optionalString(input.rowSelector, 'rowSelector');
-  const fields = parseFields(input.fields, 'fields');
-  if (!Array.isArray(input.artifacts)) fail('artifacts must be an array');
-  const artifacts = dedupe(
-    input.artifacts.map((value, index) =>
-      requireEnum(value, V1_ARTIFACT_TYPES, `artifacts[${index}]`),
-    ),
-  );
-  const config: ScrapeConfigV1 = { fields, artifacts };
-  if (waitFor !== undefined) config.waitFor = waitFor;
-  if (rowSelector !== undefined) config.rowSelector = rowSelector;
-  return config;
-}
-
 /**
- * Map the v1 shape onto a v2 step program. JSON and CSV in the v1 `artifacts`
- * list serialize the extracted rows, so they become `extract.emit`. PNG and
- * HTML become a capture. WEBM becomes a context recording.
- */
-export function upgradeScrapeConfig(input: unknown): ScrapeConfig {
-  if (isRecord(input) && input.version !== undefined) {
-    fail('upgradeScrapeConfig accepts a v1 config only');
-  }
-  const v1 = parseV1(input);
-
-  const emit = V1_ARTIFACT_TYPES.filter(
-    (type): type is 'JSON' | 'CSV' => type === 'JSON' || type === 'CSV',
-  ).filter((type) => v1.artifacts.includes(type));
-  const captureTypes = CAPTURE_TYPES.filter((type) => v1.artifacts.includes(type));
-
-  const extract: Step = {
-    op: 'extract',
-    name: 'rows',
-    fields: v1.fields,
-    emit: emit.length > 0 ? emit : ['JSON'],
-  };
-  if (v1.rowSelector !== undefined) extract.rowSelector = v1.rowSelector;
-
-  const steps: Step[] = [{ op: 'goto' }];
-  if (v1.waitFor !== undefined) steps.push({ op: 'waitFor', selector: v1.waitFor });
-  steps.push(extract);
-  if (captureTypes.length > 0) {
-    steps.push({ op: 'capture', as: [...captureTypes], name: 'page' });
-  }
-
-  const config: ScrapeConfig = { version: 2, steps, upgradedFrom: 1 };
-  if (v1.artifacts.includes('WEBM')) config.record = true;
-  return config;
-}
-
-/**
- * Validate a scrape config and always return the v2 shape. A v1 input is
- * upgraded. Validation rejects anything outside the closed step schema, so a
- * stored definition can never carry executable code.
+ * Validate a scrape config. Rejects anything outside the closed step schema,
+ * so a stored definition can never carry executable code.
  */
 export function validateScrapeConfig(input: unknown): ScrapeConfig {
   if (!isRecord(input)) fail('Scrape config must be an object');
-  if (isV1Config(input)) return upgradeScrapeConfig(input);
-
-  if (input.version !== 2) fail('version must be 2');
   if (!Array.isArray(input.steps) || input.steps.length === 0) {
     fail('steps must be a non-empty array');
   }
 
   const config: ScrapeConfig = {
-    version: 2,
     steps: input.steps.map((step, index) => parseStep(step, `steps[${index}]`)),
   };
   if (input.auth !== undefined) config.auth = parseAuth(input.auth, 'auth');
   if (input.limits !== undefined) config.limits = parseLimits(input.limits, 'limits');
   const record = optionalBoolean(input.record, 'record');
   if (record !== undefined) config.record = record;
-  if (input.upgradedFrom !== undefined) {
-    if (input.upgradedFrom !== 1) fail('upgradedFrom must be 1 when provided');
-    config.upgradedFrom = 1;
-  }
   return config;
 }
 

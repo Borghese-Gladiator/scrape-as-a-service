@@ -10,7 +10,6 @@ function buildRun(overrides: Partial<RunDetailType> = {}): RunDetailType {
   return {
     id: 'run-123456789',
     definition_id: 'def-1',
-    schedule_id: null,
     status: 'SUCCEEDED',
     trigger: 'MANUAL',
     created_at: '2026-01-01T00:00:00.000Z',

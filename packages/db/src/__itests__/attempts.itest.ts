@@ -6,8 +6,7 @@ import { finishAttempt, insertAttempt, listAttempts } from '../repositories/atte
 import type { ScrapeConfig } from '../types.js';
 
 const CONFIG: ScrapeConfig = {
-  fields: [{ name: 'title', selector: 'h1' }],
-  artifacts: ['JSON'],
+  steps: [{ op: 'extract', name: 'rows', fields: [{ name: 'title', selector: 'h1' }] }],
 };
 
 describeIntegration('attempts repository', () => {

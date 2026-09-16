@@ -7,11 +7,11 @@ A declarative web-scraping platform built as an npm-workspaces monorepo.
 ```
 packages/
   db/       PostgreSQL schema, migrations, migration runner, typed data-access repositories
-  shared/   config loader, BullMQ queue, MinIO/S3 storage, cron next-run helper, scrape-config validation
+  shared/   config loader, BullMQ queue, MinIO/S3 storage, scrape-config validation
 apps/
-  api/        REST service (Express)
+  api/        REST service (Express), also serves the OpenAPI document
   worker/     BullMQ worker + Playwright step interpreter
-  scheduler/  interval poller enqueuing due schedules
+  scheduler/  stale-run sweep + retention cleanup, on one interval timer
   web/        Next.js frontend
 ```
 
@@ -54,12 +54,7 @@ docker compose logs -f api worker scheduler
 ```
 
 Every service has a compose healthcheck, so a crash-looping worker or scheduler
-shows as `unhealthy` in `docker compose ps`. To check all three health endpoints
-from the host in one step:
-
-```bash
-node scripts/manual/phase-6-health.mjs
-```
+shows as `unhealthy` in `docker compose ps`.
 
 ### Scale workers
 
@@ -84,8 +79,8 @@ docker compose down
 
 The worker and the scheduler handle `SIGTERM` and `SIGINT`. On a stop the worker
 drains the jobs it holds, closes any open browser, and closes its Postgres pool
-and Redis connection. The scheduler finishes the poll it is in and closes the
-same resources. Both give up after 15 seconds and exit anyway.
+and Redis connection. The scheduler finishes the sweep tick it is in and closes
+the same resources. Both give up after 15 seconds and exit anyway.
 
 ### Port conflicts
 
@@ -231,15 +226,6 @@ Against a two-page table of three rows each, that definition produces
 `receipt-p1-r0-8dx6t13140.png`, its PDF, four more pairs, `rows.json`,
 `rows.csv`, and `row.json`.
 
-To see it run against a fixture site that the script serves itself:
-
-```bash
-npm run typecheck
-node scripts/manual/phase-2-interpreter.mjs
-```
-
-Run `npx playwright install chromium` first when Chromium is missing.
-
 ## Delivery: get the files out
 
 ### The local runner — no stack at all
@@ -301,9 +287,7 @@ npm run discover -- --url "<the balance page>" --cdp http://localhost:9222
 npm run job:receipts -- --out ./exports/receipts
 ```
 
-**Read [docs/RECEIPTS.md](RECEIPTS.md) before the first run.** It gives the
-exact steps, including how to start Chrome so that `--cdp` works. Two points
-matter most:
+Two points matter most before the first run:
 
 - Every selector in the shipped definition is an **unverified Kendo UI 2022.1
   default**. The page is behind a login, so nobody has seen its markup. The
@@ -321,14 +305,6 @@ JavaScript handler. The discovery report names which to use.
 | `definitions/courtreserve-receipts.json` | `openLink` on the control's `href`. The default. |
 | `definitions/courtreserve-receipts-newtab.json` | `click` with `opens: newTab`, then `capture`, then `goBack`. |
 
-To prove the plumbing without the live site, run the manual script. It serves a
-fixture with the same Kendo markup, runs the shipped definition against it, and
-checks every file it produces. It needs only Chromium:
-
-```bash
-node scripts/manual/phase-9-courtreserve-fixture.mjs
-```
-
 ### The discovery CLI
 
 ```bash
@@ -343,21 +319,6 @@ with a suggested `rowSelector`, `nextSelector` and receipt-control selector,
 each with the evidence behind it. It prints the report and writes it as JSON.
 
 It changes nothing on the page.
-
-### The v1 config
-
-A definition that carries no `version` is a v1 config. `POST /definitions`
-upgrades it on write, so a stored config is always v2. The mapping is:
-
-```
-v1 { waitFor, rowSelector, fields, artifacts }
- -> [ goto, waitFor?, extract(name: 'rows'), capture(name: 'page')? ]
-```
-
-`JSON` and `CSV` in the v1 `artifacts` list serialize the extracted rows, so
-they become `extract.emit`. `PNG` and `HTML` become a capture. `WEBM` becomes
-`record: true`. An upgraded config keeps the v1 filenames: `data.json`,
-`data.csv`, `screenshot.png`, `source.html`, and `recording.webm`.
 
 ## Security
 
@@ -525,28 +486,19 @@ the browser can reach. In the compose stack the API talks to `minio` over the
 Docker network, which the browser cannot resolve; the page falls back to the
 streaming URL there.
 
-### Manual check
-
-```bash
-API_BASE_URL=http://localhost:4000 API_KEY=... node scripts/manual/phase-4-auth.mjs
-```
-
-It proves that an unauthenticated request gets 401, that `/health` gets 200,
-that a secret round-trips without the value ever appearing in a response, and
-that the guard rejects a definition pointed at `http://169.254.169.254/`. It
-deletes every row it creates.
-
 ## The API
+
+`GET /openapi.json` returns the generated OpenAPI 3 document for every route
+below. It needs no API key, so a tool like Postman can import it straight from
+a running stack.
 
 | Route | Purpose |
 | --- | --- |
 | `GET /definitions` | One page of definitions. A soft-deleted one never appears. |
 | `GET /definitions/:id` | One definition. A soft-deleted one still answers. |
-| `POST /definitions` | Create. It accepts a v1 or a v2 config and stores v2. |
+| `POST /definitions` | Create. Accepts a v2 step program. |
 | `PUT /definitions/:id` | Update `name`, `url`, or `config`. Each is optional. |
 | `DELETE /definitions/:id` | Soft delete. The runs and artifacts stay readable. |
-| `GET /schedules` · `POST /schedules` · `PATCH /schedules/:id` | List, create, enable. |
-| `DELETE /schedules/:id` | Remove a schedule. |
 | `GET /runs` | One page of runs. It takes `?definitionId=` and `?status=`. |
 | `GET /runs/:id` | The run, its attempts, and its artifacts. |
 | `POST /runs` | Trigger a run. |
@@ -586,11 +538,10 @@ MinIO. Set `RETENTION_DAYS=0` to keep everything.
 
 ## End-to-end walkthrough
 
-1. Open http://localhost:3000 → **New definition**. Give it a name, a reachable
-   URL (e.g. `https://example.com`), a row selector / field selectors, and check
-   the **JSON**, **CSV**, and **PNG** artifacts. Create it. The form still posts
-   a v1 config; the API upgrades it to a v2 step program on write. Phase 7 adds
-   a step editor.
+1. Open http://localhost:3000 → **New definition**. Give it a name and a
+   reachable URL (e.g. `https://example.com`), then build a step program with
+   the step editor: a `goto`, an `extract` with a row selector and fields, and
+   a `capture`. Create it.
 2. On the definition page click **Run**. Open the run from **Run history**: it
    transitions `QUEUED → RUNNING → SUCCEEDED` with an attempt recorded. The run
    page shows a live indicator and refreshes itself every 2 seconds until the
@@ -601,63 +552,27 @@ MinIO. Set `RETENTION_DAYS=0` to keep everything.
    (e.g. `https://does-not-exist.invalid`) and run it. Multiple
    `ScrapeRunAttempt` rows are created with exponential backoff; after retries are
    exhausted the run ends `FAILED` with the error recorded on each attempt.
-5. **Schedule:** on a definition, add a cron schedule (with timezone) and enable
-   it. When it comes due the `scheduler` creates a `SCHEDULE`-triggered run that
-   the worker picks up.
-6. **Stale run:** start a run, then `docker compose kill worker`. The attempt
+5. **Stale run:** start a run, then `docker compose kill worker`. The attempt
    stops its heartbeat. Within `STALE_ATTEMPT_MINUTES` the scheduler marks the
    attempt and the run `FAILED` with the error code `STALE`.
-7. **Export:** on a `SUCCEEDED` run, click **Download all as ZIP**, or run
+6. **Export:** on a `SUCCEEDED` run, click **Download all as ZIP**, or run
    `npm run export -- --run <run-id> --out ./receipts`.
-
-To prove the delivery path against a fixture site, run the manual script. Part
-one needs only Chromium. Part two needs Postgres and MinIO, and it deletes every
-row and object that it creates:
-
-```bash
-npm run build
-node scripts/manual/phase-5-export.mjs
-```
-
-To prove the CourtReserve job against a Kendo-shaped fixture, with no stack and
-no live session:
-
-```bash
-node scripts/manual/phase-9-courtreserve-fixture.mjs
-```
 
 ## Run reliability
 
-Every run reaches a terminal status, through one of four paths.
+Every run reaches a terminal status, through one of two paths.
 
 | Failure | Mechanism |
 | --- | --- |
 | A scrape that never settles | `RUN_TIMEOUT_MS` bounds the scrape inside the worker. The run fails with the code `TIMEOUT`. |
 | A worker that dies mid-job | The attempt stops its 15-second heartbeat. The scheduler sweeper fails the attempt and the run with the code `STALE` after `STALE_ATTEMPT_MINUTES`. |
-| Two schedulers, one due schedule | The poller claims the schedule with `SELECT ... FOR UPDATE SKIP LOCKED`, and creates the run and advances the schedule in that same transaction. Exactly one run is created. |
-| A scheduler outage | The schedule's `catchUp` policy decides. `skip` forgets the missed windows. `runOnce` records one run against the oldest missed window, then resumes the cadence. |
 
 Every failure carries a code from a closed set: `TIMEOUT`, `SELECTOR_NOT_FOUND`,
 `NAVIGATION_FAILED`, `AUTH_FAILED`, `LIMIT_EXCEEDED`, `STORAGE_FAILED`, `STALE`,
 `UNKNOWN`. The code is stored on the attempt as `error_code`.
 
-`POST /schedules` accepts `catchUp` with the value `skip` (the default) or
-`runOnce`.
-
 Each worker process launches one Chromium and reuses it. Each job takes its own
 browser context, which stays the isolation boundary.
-
-To check the sweeper, the scheduler claim, and the catch-up policies against a
-real database:
-
-```bash
-npm run build
-npm run migrate
-node scripts/manual/phase-3-stale.mjs "$DATABASE_URL"
-node scripts/manual/phase-3-scheduler.mjs "$DATABASE_URL"
-```
-
-Both scripts remove every row that they write.
 
 ### `POST /runs`
 
@@ -667,7 +582,6 @@ Both scripts remove every row that they write.
 
 `definitionId` is required. `trigger` is optional. The accepted values are
 `MANUAL` and `API`, and the default is `MANUAL`. Any other value answers 400.
-The scheduler writes the third trigger, `SCHEDULE`, so the API rejects it.
 
 The response is the new run with status `QUEUED`.
 
@@ -827,7 +741,7 @@ All configuration is read from the environment (see `.env.example`):
 | `WORKER_HEALTH_PORT` | Port of the worker `/health` server (default `4001`) |
 | `SCHEDULER_HEALTH_PORT` | Port of the scheduler `/health` server (default `4002`) |
 | `LOG_LEVEL` | Log level for every service: `trace`, `debug`, `info`, `warn`, `error`, `fatal` or `silent` (default `info`) |
-| `SCHEDULER_INTERVAL_MS` | Scheduler poll interval |
+| `SCHEDULER_INTERVAL_MS` | Interval between the scheduler's stale-run sweep ticks |
 | `WORKER_CONCURRENCY` | Worker job concurrency |
 | `RUN_TIMEOUT_MS` | Hard limit on one scrape, in milliseconds (default `120000`) |
 | `STALE_ATTEMPT_MINUTES` | How long an attempt may go without a heartbeat before the scheduler fails it (default `10`) |
@@ -843,9 +757,8 @@ All configuration is read from the environment (see `.env.example`):
 ## Web frontend (`apps/web`)
 
 Next.js + TypeScript UI over the `api` service: create/list scrape
-definitions, add cron schedules (timezone + enable toggle), trigger manual
-runs, and inspect run history with per-run attempts, failure info, and
-artifact download links.
+definitions, trigger manual runs, and inspect run history with per-run
+attempts, failure info, and artifact download links.
 
 ```bash
 # with the api service running on :4000
@@ -857,9 +770,8 @@ npm run build --workspace @scraper/web
 npm run test --workspace @scraper/web
 ```
 
-Manual flow: create a definition → open it → add a schedule and toggle
-enable/disable → click **Run** → open the run from history → view attempts and
-download artifacts for a completed run.
+Manual flow: create a definition → open it → click **Run** → open the run from
+history → view attempts and download artifacts for a completed run.
 
 ### The step program editor
 
@@ -888,8 +800,5 @@ JSON mode:
 - An invalid program shows the error inline. The **Form** button and the save
   button stay disabled until the program is valid again.
 - A round trip between the two modes keeps every field.
-
-To build the CourtReserve program, follow the numbered walkthrough in
-`docs/plans/phase-7-step-editor.md`.
 
 The edit page needs `GET /definitions/:id` and `PUT /definitions/:id`.

@@ -11,11 +11,13 @@
     "dev": "tsc -b && node dist/server.js"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@scraper/db": "*",
     "@scraper/shared": "*",
     "archiver": "^7.0.1",
     "cors": "^2.8.6",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/archiver": "^6.0.4",

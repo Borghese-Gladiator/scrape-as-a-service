@@ -2,9 +2,8 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { deleteSecret, listSecrets, upsertSecret } from '@scraper/db';
 import { encryptSecret } from '@scraper/shared';
-import { asyncHandler, HttpError } from '../http.js';
-
-const NAME_PATTERN = /^[a-zA-Z0-9._-]{1,120}$/;
+import { asyncHandler, HttpError, parseBody } from '../http.js';
+import { CreateSecretBody } from '../schemas.js';
 
 /**
  * The store is write-and-forget from the API side. A value goes in encrypted
@@ -23,23 +22,15 @@ export function secretsRouter(pool: Pool): Router {
   router.post(
     '/',
     asyncHandler(async (req, res) => {
-      const body = req.body as Record<string, unknown>;
-      const name = body?.name;
-      const value = body?.value;
-      if (typeof name !== 'string' || !NAME_PATTERN.test(name)) {
-        throw new HttpError(400, 'name is required and must match [a-zA-Z0-9._-]{1,120}');
-      }
-      if (typeof value !== 'string' || value.length === 0) {
-        throw new HttpError(400, 'value is required');
-      }
+      const body = parseBody(CreateSecretBody, req.body);
 
       let ciphertext: string;
       try {
-        ciphertext = encryptSecret(value);
+        ciphertext = encryptSecret(body.value);
       } catch (err) {
         throw new HttpError(500, (err as Error).message);
       }
-      res.status(201).json(await upsertSecret(pool, name, ciphertext));
+      res.status(201).json(await upsertSecret(pool, body.name, ciphertext));
     }),
   );
 

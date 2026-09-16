@@ -1,6 +1,6 @@
 export type RunStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
 export type AttemptStatus = 'RUNNING' | 'SUCCEEDED' | 'FAILED';
-export type RunTrigger = 'MANUAL' | 'API' | 'SCHEDULE';
+export type RunTrigger = 'MANUAL' | 'API';
 export type ArtifactType = 'JSON' | 'CSV' | 'PNG' | 'HTML' | 'WEBM' | 'PDF';
 export type CaptureType = 'PNG' | 'PDF' | 'HTML';
 export type WaitUntil = 'load' | 'domcontentloaded' | 'networkidle';
@@ -13,9 +13,6 @@ export const ARTIFACT_TYPES: readonly ArtifactType[] = [
   'WEBM',
   'PDF',
 ];
-
-/** The artifact types that the v1 definition form offers. */
-export const V1_ARTIFACT_TYPES: readonly ArtifactType[] = ['JSON', 'CSV', 'PNG', 'HTML', 'WEBM'];
 
 export interface ScrapeFieldSelector {
   name: string;
@@ -65,20 +62,10 @@ export type Step =
   | { op: 'goBack' };
 
 export interface ScrapeConfig {
-  version: 2;
   auth?: AuthConfig;
   steps: Step[];
   limits?: Limits;
   record?: boolean;
-  upgradedFrom?: 1;
-}
-
-/** The v1 shape. The API still accepts it and upgrades it on write. */
-export interface ScrapeConfigV1 {
-  waitFor?: string;
-  rowSelector?: string;
-  fields: ScrapeFieldSelector[];
-  artifacts: ArtifactType[];
 }
 
 export interface ScrapeDefinition {
@@ -96,21 +83,9 @@ export interface Page<T> {
   nextCursor: string | null;
 }
 
-export interface ScrapeSchedule {
-  id: string;
-  definition_id: string;
-  cron: string;
-  timezone: string;
-  enabled: boolean;
-  last_run_at: string | null;
-  next_run_at: string | null;
-  created_at: string;
-}
-
 export interface ScrapeRun {
   id: string;
   definition_id: string;
-  schedule_id: string | null;
   status: RunStatus;
   trigger: RunTrigger;
   created_at: string;
@@ -150,21 +125,14 @@ export interface RunDetail extends ScrapeRun {
 export interface CreateDefinitionInput {
   name: string;
   url: string;
-  config: ScrapeConfig | ScrapeConfigV1;
+  config: ScrapeConfig;
 }
 
 /** `PUT /definitions/:id` replaces the whole definition. */
 export interface UpdateDefinitionInput {
   name: string;
   url: string;
-  config: ScrapeConfig | ScrapeConfigV1;
-}
-
-export interface CreateScheduleInput {
-  definitionId: string;
-  cron: string;
-  timezone: string;
-  enabled?: boolean;
+  config: ScrapeConfig;
 }
 
 export interface ApiClient {
@@ -173,9 +141,6 @@ export interface ApiClient {
   createDefinition(input: CreateDefinitionInput): Promise<ScrapeDefinition>;
   updateDefinition(id: string, input: UpdateDefinitionInput): Promise<ScrapeDefinition>;
   deleteDefinition(id: string): Promise<void>;
-  listSchedules(definitionId?: string): Promise<ScrapeSchedule[]>;
-  createSchedule(input: CreateScheduleInput): Promise<ScrapeSchedule>;
-  toggleSchedule(id: string, enabled: boolean): Promise<ScrapeSchedule>;
   triggerRun(definitionId: string): Promise<ScrapeRun>;
   listRuns(definitionId?: string): Promise<ScrapeRun[]>;
   getRun(id: string): Promise<RunDetail>;

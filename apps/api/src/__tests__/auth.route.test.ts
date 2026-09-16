@@ -31,9 +31,6 @@ function app() {
 const ROUTES = [
   { method: 'get', path: '/definitions' },
   { method: 'post', path: '/definitions' },
-  { method: 'get', path: '/schedules' },
-  { method: 'post', path: '/schedules' },
-  { method: 'patch', path: '/schedules/s-1' },
   { method: 'get', path: '/runs' },
   { method: 'get', path: '/runs/run-1' },
   { method: 'post', path: '/runs' },
@@ -83,6 +80,15 @@ describe('the X-API-Key check', () => {
     const res = await request(app()).get('/health').set(headers);
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ status: 'ok' });
+  });
+
+  it.each([
+    { desc: 'no key', headers: {} },
+    { desc: 'a wrong key', headers: { 'X-API-Key': 'wrong' } },
+  ])('returns 200 for /openapi.json with $desc', async ({ headers }) => {
+    const res = await request(app()).get('/openapi.json').set(headers);
+    expect(res.status).toBe(200);
+    expect(res.body.openapi).toMatch(/^3\./);
   });
 
   it('serves every route when no key is configured', async () => {

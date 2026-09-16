@@ -1,9 +1,4 @@
-import type {
-  ArtifactType,
-  ScrapeConfig,
-  StorageClient,
-  StoragePutResult,
-} from '@scraper/shared';
+import type { ArtifactType, StorageClient, StoragePutResult } from '@scraper/shared';
 import { runObjectKey, ScrapeError } from '@scraper/shared';
 import type { ScrapeDiagnostics } from './diagnostics.js';
 import type { ScrapeResult } from './interpreter.js';
@@ -38,23 +33,6 @@ export function toCsv(rows: Record<string, string | null>[]): Buffer {
   return Buffer.from(lines.join('\n'), 'utf8');
 }
 
-/**
- * A config that `upgradeScrapeConfig` produced names its extract `rows` and its
- * capture `page`. Map those back to the v1 filenames, so an old definition
- * keeps producing the files its consumers expect.
- */
-const V1_ARTIFACT_NAMES: Record<string, string> = {
-  'rows.json': 'data.json',
-  'rows.csv': 'data.csv',
-  'page.png': 'screenshot.png',
-  'page.html': 'source.html',
-};
-
-export function artifactFilename(config: ScrapeConfig, name: string): string {
-  if (config.upgradedFrom !== 1) return name;
-  return V1_ARTIFACT_NAMES[name] ?? name;
-}
-
 export interface UploadedArtifact {
   type: ArtifactType;
   name: string;
@@ -66,12 +44,11 @@ export interface UploadedArtifact {
 export async function buildAndUploadArtifacts(
   storage: StorageClient,
   runId: string,
-  config: ScrapeConfig,
   result: ScrapeResult,
 ): Promise<UploadedArtifact[]> {
   const uploaded: UploadedArtifact[] = [];
   for (const artifact of result.artifacts) {
-    const name = artifactFilename(config, artifact.name);
+    const name = artifact.name;
     const key = runObjectKey(runId, name);
     let put: StoragePutResult;
     try {

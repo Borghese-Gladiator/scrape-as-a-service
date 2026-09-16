@@ -8,10 +8,10 @@ import {
 import type { ScrapeConfig } from '../types.js';
 
 const CONFIG: ScrapeConfig = {
-  waitFor: 'body',
-  rowSelector: 'tr',
-  fields: [{ name: 'title', selector: 'h1' }],
-  artifacts: ['JSON'],
+  steps: [
+    { op: 'waitFor', selector: 'body' },
+    { op: 'extract', name: 'rows', rowSelector: 'tr', fields: [{ name: 'title', selector: 'h1' }] },
+  ],
 };
 
 describeIntegration('definitions repository', () => {
@@ -48,7 +48,7 @@ describeIntegration('definitions repository', () => {
     });
 
     const rows = await listDefinitions(pool);
-    expect(rows.map((r) => r.id)).toEqual([second.id, first.id]);
+    expect(rows.items.map((r) => r.id)).toEqual([second.id, first.id]);
   });
 
   it('gets one definition by id and returns null for an unknown id', async () => {

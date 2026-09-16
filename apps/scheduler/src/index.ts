@@ -1,13 +1,11 @@
 import { closePool, getPool } from '@scraper/db';
 import {
   createLogger,
-  getQueue,
   getStorage,
   loadConfig,
   onShutdown,
   startHealthServer,
 } from '@scraper/shared';
-import { pollOnce } from './poll.js';
 import { sweepOnce } from './sweep.js';
 import { sweepRetention } from './retention.js';
 
@@ -18,7 +16,6 @@ export async function startScheduler(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger('scheduler');
   const pool = getPool(config);
-  const queue = getQueue(config);
   const storage = getStorage(config);
 
   // The in-flight promise is both the overlap guard and the handle shutdown waits on.
@@ -27,10 +24,6 @@ export async function startScheduler(): Promise<void> {
   const tick = async () => {
     try {
       const now = new Date();
-      const count = await pollOnce({ pool, queue, now });
-      if (count > 0) {
-        logger.info({ count }, 'scheduler enqueued runs');
-      }
       const swept = await sweepOnce({
         pool,
         now,
@@ -41,7 +34,7 @@ export async function startScheduler(): Promise<void> {
         console.log(`scheduler failed ${swept} stale attempt(s)`);
       }
     } catch (err) {
-      logger.error({ err }, 'scheduler poll failed');
+      logger.error({ err }, 'stale sweep failed');
     }
   };
 
@@ -88,7 +81,6 @@ export async function startScheduler(): Promise<void> {
       clearInterval(retentionTimer);
       await inFlight;
       await health.close();
-      await queue.close();
       await closePool();
     },
     {

@@ -51,7 +51,7 @@ export async function openScrapeSession(
       await runProgram(
         context,
         url,
-        { version: 2, steps: config.auth.steps },
+        { steps: config.auth.steps },
         {
           secrets: deps.secrets,
           now: deps.now,

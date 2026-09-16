@@ -25,8 +25,10 @@ vi.mock('../scrape.js', () => ({
 import { processRun } from '../process-run.js';
 
 const DEF_CONFIG: ScrapeConfig = {
-  fields: [{ name: 'title', selector: 'h1' }],
-  artifacts: ['JSON'],
+  steps: [
+    { op: 'goto' },
+    { op: 'extract', name: 'rows', fields: [{ name: 'title', selector: 'h1' }] },
+  ],
 };
 
 class FakeDb implements Queryable {

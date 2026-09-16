@@ -3,7 +3,7 @@ import type { RequestHandler } from 'express';
 import { HttpError } from './http.js';
 
 /** Paths that answer without a key. Keep this list as short as it is today. */
-const EXEMPT_PATHS = new Set(['/health']);
+const EXEMPT_PATHS = new Set(['/health', '/openapi.json']);
 
 function digest(value: string): Buffer {
   return createHash('sha256').update(value, 'utf8').digest();
@@ -18,8 +18,9 @@ function matches(expected: string, supplied: string): boolean {
 }
 
 /**
- * Require `X-API-Key` on every route except `/health`. An empty `apiKey` turns
- * the check off; `startApi` refuses that combination in production.
+ * Require `X-API-Key` on every route except the ones in `EXEMPT_PATHS`. An
+ * empty `apiKey` turns the check off; `startApi` refuses that combination in
+ * production.
  */
 export function apiKeyMiddleware(apiKey: string): RequestHandler {
   return (req, _res, next) => {

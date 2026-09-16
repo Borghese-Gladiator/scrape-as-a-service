@@ -4,16 +4,7 @@ export type { ArtifactType, ScrapeConfig };
 
 export type RunStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
 export type AttemptStatus = 'RUNNING' | 'SUCCEEDED' | 'FAILED';
-export type RunTrigger = 'MANUAL' | 'API' | 'SCHEDULE';
-export type CatchUpPolicy = 'skip' | 'runOnce';
-
-export const CATCH_UP_POLICIES: readonly CatchUpPolicy[] = ['skip', 'runOnce'];
-
-export function isCatchUpPolicy(value: unknown): value is CatchUpPolicy {
-  return (
-    typeof value === 'string' && (CATCH_UP_POLICIES as readonly string[]).includes(value)
-  );
-}
+export type RunTrigger = 'MANUAL' | 'API';
 
 export interface ScrapeDefinition {
   id: string;
@@ -24,22 +15,9 @@ export interface ScrapeDefinition {
   deleted_at: Date | null;
 }
 
-export interface ScrapeSchedule {
-  id: string;
-  definition_id: string;
-  cron: string;
-  timezone: string;
-  enabled: boolean;
-  last_run_at: Date | null;
-  next_run_at: Date | null;
-  catch_up: CatchUpPolicy;
-  created_at: Date;
-}
-
 export interface ScrapeRun {
   id: string;
   definition_id: string;
-  schedule_id: string | null;
   status: RunStatus;
   trigger: RunTrigger;
   created_at: Date;
@@ -90,14 +68,6 @@ export interface UpdateDefinitionInput {
   name?: string;
   url?: string;
   config?: ScrapeConfig;
-}
-
-export interface CreateScheduleInput {
-  definitionId: string;
-  cron: string;
-  timezone: string;
-  enabled?: boolean;
-  catchUp?: CatchUpPolicy;
 }
 
 /** One keyset page. `nextCursor` is null when the page is the last one. */

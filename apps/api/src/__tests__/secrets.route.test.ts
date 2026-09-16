@@ -38,7 +38,6 @@ function fakePool(stored: { ciphertext?: string }): Pool {
             name: 'Receipts',
             url: 'https://example.com',
             config: {
-              version: 2,
               auth: { mode: 'storageState', secretRef: SECRET_NAME },
               steps: [
                 { op: 'goto' },

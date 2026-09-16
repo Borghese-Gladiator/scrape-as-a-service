@@ -10,13 +10,7 @@ import { servicesAvailable } from './services.js';
  */
 export const describeIntegration = servicesAvailable() ? describe : describe.skip;
 
-const TABLES = [
-  'artifacts',
-  'scrape_run_attempts',
-  'scrape_runs',
-  'scrape_schedules',
-  'scrape_definitions',
-];
+const TABLES = ['artifacts', 'scrape_run_attempts', 'scrape_runs', 'scrape_definitions'];
 
 export async function truncateAll(pool: Pool): Promise<void> {
   await pool.query(`TRUNCATE ${TABLES.join(', ')} RESTART IDENTITY CASCADE`);

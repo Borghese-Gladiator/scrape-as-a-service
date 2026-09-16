@@ -28,9 +28,8 @@ function fakePool(): Pool {
           {
             id: 'run-1',
             definition_id: values[0],
-            schedule_id: values[1] ?? null,
             status: 'QUEUED',
-            trigger: values[2],
+            trigger: values[1],
             created_at: new Date(),
             started_at: null,
             finished_at: null,
@@ -83,10 +82,6 @@ describe('POST /runs (manual trigger)', () => {
   it.each([
     { desc: 'definitionId is missing', body: {} },
     { desc: 'the trigger is unknown', body: { definitionId: 'def-1', trigger: 'CRON' } },
-    {
-      desc: 'the trigger is SCHEDULE',
-      body: { definitionId: 'def-1', trigger: 'SCHEDULE' },
-    },
   ])('returns 400 when $desc', async ({ body }) => {
     const queue = { add: vi.fn() } as unknown as Queue<ScrapeJobData>;
     const app = createServer(fakePool(), queue, storage);

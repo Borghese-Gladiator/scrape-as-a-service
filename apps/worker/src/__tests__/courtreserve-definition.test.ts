@@ -32,9 +32,8 @@ describe.each([
   { name: 'courtreserve-receipts-newtab.json', file: NEW_TAB },
 ])('$name', ({ file }) => {
   it('passes the config validator and carries the target URL', () => {
-    const config = validateScrapeConfig(file.config);
+    validateScrapeConfig(file.config);
 
-    expect(config.version).toBe(2);
     expect(file.url).toBe(
       'https://app.courtreserve.com/Online/MyBalance/Index/13140?page=details',
     );

@@ -74,7 +74,6 @@ function fakeBrowser(context: FakeContext): Browser {
 }
 
 const CONFIG = {
-  version: 2,
   steps: [
     { op: 'goto' },
     { op: 'waitFor', selector: 'table tbody tr' },
@@ -181,29 +180,6 @@ describe('runLocal', () => {
     expect(result.url).toBe(LIST_URL);
     expect(result.files).toHaveLength(7);
   });
-
-  it('keeps the v1 filenames for an upgraded v1 definition', async () => {
-    const definitionPath = await writeDefinition({
-      url: LIST_URL,
-      config: {
-        rowSelector: 'table tbody tr',
-        fields: [{ name: 'receipt', selector: 'td.receipt-no' }],
-        artifacts: ['JSON', 'CSV', 'PNG'],
-      },
-    });
-    const outDir = join(workDir, 'out');
-
-    await runLocal(
-      { definitionPath, outDir, allowPrivateUrls: true },
-      { launchBrowser: async () => fakeBrowser(fixtureSite()), log: () => {} },
-    );
-
-    expect((await readdir(outDir)).sort()).toEqual([
-      'data.csv',
-      'data.json',
-      'screenshot.png',
-    ]);
-  });
 });
 
 describe('run-local main', () => {
@@ -238,7 +214,7 @@ describe('run-local main', () => {
     },
     {
       desc: 'a config that the validator rejects',
-      build: () => writeDefinition({ url: LIST_URL, config: { version: 2, steps: [] } }),
+      build: () => writeDefinition({ url: LIST_URL, config: { steps: [] } }),
     },
     {
       desc: 'a definition that carries no url',
@@ -262,7 +238,6 @@ describe('run-local main', () => {
     const definitionPath = await writeDefinition({
       url: LIST_URL,
       config: {
-        version: 2,
         steps: [{ op: 'goto' }, { op: 'waitFor', selector: 'table#absent' }],
       },
     });

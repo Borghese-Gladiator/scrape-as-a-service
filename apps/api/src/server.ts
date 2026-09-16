@@ -16,8 +16,8 @@ import {
 import { apiKeyMiddleware, assertApiKeyPolicy } from './auth.js';
 import { errorMiddleware } from './http.js';
 import { requestLogger } from './logging.js';
+import { buildOpenApiDocument } from './openapi.js';
 import { definitionsRouter, type AssertUrl } from './routes/definitions.js';
-import { schedulesRouter } from './routes/schedules.js';
 import { runsRouter } from './routes/runs.js';
 import { artifactsRouter } from './routes/artifacts.js';
 import { secretsRouter } from './routes/secrets.js';
@@ -53,8 +53,11 @@ export function createServer(
     res.json({ status: 'ok' });
   });
 
+  app.get('/openapi.json', (_req, res) => {
+    res.json(buildOpenApiDocument());
+  });
+
   app.use('/definitions', definitionsRouter(pool, assertUrl));
-  app.use('/schedules', schedulesRouter(pool));
   app.use('/runs', runsRouter(pool, queue));
   app.use('/secrets', secretsRouter(pool));
   app.use('/', artifactsRouter(pool, storage));

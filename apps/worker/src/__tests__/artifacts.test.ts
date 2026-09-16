@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { ScrapeConfig, StorageClient, StoragePutResult } from '@scraper/shared';
-import { upgradeScrapeConfig } from '@scraper/shared';
+import type { StorageClient, StoragePutResult } from '@scraper/shared';
 import { buildAndUploadArtifacts, toCsv } from '../artifacts.js';
 import type { ScrapeResult } from '../interpreter.js';
 
@@ -82,12 +81,10 @@ function result(names: Array<[string, string]>): ScrapeResult {
 describe('buildAndUploadArtifacts', () => {
   it('uploads every artifact under runs/<run-id>/ and returns its name', async () => {
     const storage = fakeStorage();
-    const config: ScrapeConfig = { version: 2, steps: [{ op: 'goBack' }] };
 
     const uploaded = await buildAndUploadArtifacts(
       storage,
       'run-1',
-      config,
       result([
         ['receipt-0.png', 'image/png'],
         ['receipt-1.png', 'image/png'],
@@ -100,33 +97,10 @@ describe('buildAndUploadArtifacts', () => {
     ]);
   });
 
-  it.each([
-    ['rows.json', 'data.json'],
-    ['rows.csv', 'data.csv'],
-    ['page.png', 'screenshot.png'],
-    ['page.html', 'source.html'],
-    ['recording.webm', 'recording.webm'],
-    ['receipt-0.png', 'receipt-0.png'],
-  ])('maps %s to %s for an upgraded v1 config', async (name, expected) => {
-    const config = upgradeScrapeConfig({
-      fields: [{ name: 'a', selector: 'b' }],
-      artifacts: ['JSON', 'CSV', 'PNG', 'HTML', 'WEBM'],
-    });
+  it('leaves the artifact name alone', async () => {
     const uploaded = await buildAndUploadArtifacts(
       fakeStorage(),
       'run-1',
-      config,
-      result([[name, 'image/png']]),
-    );
-    expect(uploaded[0]?.name).toBe(expected);
-  });
-
-  it('leaves a v2 name alone', async () => {
-    const config: ScrapeConfig = { version: 2, steps: [{ op: 'goBack' }] };
-    const uploaded = await buildAndUploadArtifacts(
-      fakeStorage(),
-      'run-1',
-      config,
       result([['rows.json', 'application/json']]),
     );
     expect(uploaded[0]?.name).toBe('rows.json');

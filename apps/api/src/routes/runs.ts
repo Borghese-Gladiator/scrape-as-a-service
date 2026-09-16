@@ -15,29 +15,16 @@ import {
 } from '@scraper/db';
 import { enqueueRun, type ScrapeJobData } from '@scraper/shared';
 import type { RunTrigger } from '@scraper/db';
-import { asyncHandler, HttpError } from '../http.js';
+import { asyncHandler, HttpError, parseBody } from '../http.js';
 import { pageQuery, queryString, runStatus } from '../query.js';
+import { CreateRunBody } from '../schemas.js';
 
 /**
  * A cancel reuses FAILED and records the reason as an error code, so the run
- * status enum keeps its four values. See docs/plans/phase-5-delivery.md.
+ * status enum keeps its four values.
  */
 const CANCEL_CODE = 'CANCELLED';
 const CANCEL_MESSAGE = 'the run was cancelled through the API';
-
-const API_TRIGGERS: RunTrigger[] = ['MANUAL', 'API'];
-
-/**
- * SCHEDULE is absent on purpose: only the scheduler writes that trigger, so a
- * caller must not be able to claim it.
- */
-function parseTrigger(value: unknown): RunTrigger {
-  if (value === undefined) return 'MANUAL';
-  if (typeof value !== 'string' || !API_TRIGGERS.includes(value as RunTrigger)) {
-    throw new HttpError(400, `trigger must be one of: ${API_TRIGGERS.join(', ')}`);
-  }
-  return value as RunTrigger;
-}
 
 async function trigger(
   pool: Pool,
@@ -89,13 +76,8 @@ export function runsRouter(pool: Pool, queue: Queue<ScrapeJobData>): Router {
   router.post(
     '/',
     asyncHandler(async (req, res) => {
-      const body = req.body as Record<string, unknown>;
-      const definitionId = body?.definitionId;
-      if (typeof definitionId !== 'string' || definitionId.length === 0) {
-        throw new HttpError(400, 'definitionId is required');
-      }
-      const source = parseTrigger(body?.trigger);
-      const run = await trigger(pool, queue, definitionId, source);
+      const body = parseBody(CreateRunBody, req.body);
+      const run = await trigger(pool, queue, body.definitionId, body.trigger ?? 'MANUAL');
       res.status(201).json(run);
     }),
   );

@@ -2,12 +2,10 @@ import type {
   ApiClient,
   Artifact,
   CreateDefinitionInput,
-  CreateScheduleInput,
   Page,
   RunDetail,
   ScrapeDefinition,
   ScrapeRun,
-  ScrapeSchedule,
   UpdateDefinitionInput,
 } from './types';
 
@@ -116,22 +114,6 @@ export function getApiClient(baseUrl?: string): ApiClient {
     },
     deleteDefinition(id: string) {
       return requestVoid(`${base}/definitions/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    },
-    listSchedules(definitionId?: string) {
-      const query = definitionId ? `?definitionId=${encodeURIComponent(definitionId)}` : '';
-      return request<ScrapeSchedule[]>(`${base}/schedules${query}`);
-    },
-    createSchedule(input: CreateScheduleInput) {
-      return request<ScrapeSchedule>(`${base}/schedules`, {
-        method: 'POST',
-        body: JSON.stringify(input),
-      });
-    },
-    toggleSchedule(id: string, enabled: boolean) {
-      return request<ScrapeSchedule>(`${base}/schedules/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ enabled }),
-      });
     },
     triggerRun(definitionId: string) {
       return request<ScrapeRun>(`${base}/runs`, {

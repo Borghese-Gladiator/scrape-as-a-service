@@ -9,7 +9,6 @@ const definition: ScrapeDefinition = {
   name: 'Receipts',
   url: 'https://example.com/transactions',
   config: {
-    version: 2,
     steps: [{ op: 'goto' }, { op: 'click', selector: 'a.tab' }],
   },
   created_at: '2026-01-01T00:00:00.000Z',

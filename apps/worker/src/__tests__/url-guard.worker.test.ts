@@ -17,12 +17,7 @@ function site(): FakeContext {
 }
 
 function run(steps: Step[], assertUrl: (url: string) => Promise<void>) {
-  return runProgram(
-    site().asBrowserContext(),
-    LIST_URL,
-    { version: 2, steps },
-    { assertUrl },
-  );
+  return runProgram(site().asBrowserContext(), LIST_URL, { steps }, { assertUrl });
 }
 
 describe('the interpreter applies the URL guard', () => {

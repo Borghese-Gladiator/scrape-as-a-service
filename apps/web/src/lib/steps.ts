@@ -90,7 +90,7 @@ export function createStep(op: StepOp): Step {
 }
 
 export function createProgram(): ScrapeConfig {
-  return { version: 2, auth: { mode: 'none' }, steps: [createStep('goto')] };
+  return { auth: { mode: 'none' }, steps: [createStep('goto')] };
 }
 
 export function createAuth(mode: AuthMode): AuthConfig {

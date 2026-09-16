@@ -67,7 +67,7 @@ function run(
   extra: Partial<ScrapeConfig> = {},
   options?: RunScrapeOptions,
 ): Promise<ScrapeResult> {
-  const config: ScrapeConfig = { version: 2, steps, ...extra };
+  const config: ScrapeConfig = { steps, ...extra };
   return runProgram(context.asBrowserContext(), LIST_URL, config, options);
 }
 

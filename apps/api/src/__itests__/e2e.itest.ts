@@ -90,7 +90,7 @@ describeIntegration('end to end: definition to artifact download', () => {
           pool,
           storage,
           workerId: 'e2e-worker',
-          launchBrowser: () => chromium.launch(),
+          getBrowser: () => chromium.launch(),
         });
       },
       { connection: getRedisConnection(config), concurrency: 1 },
@@ -103,7 +103,9 @@ describeIntegration('end to end: definition to artifact download', () => {
     });
     fixtureUrl = `http://127.0.0.1:${await listen(fixture)}/`;
 
-    api = createHttpServer(createServer(pool, queue, storage));
+    api = createHttpServer(
+      createServer(pool, queue, storage, { assertUrl: async () => {} }),
+    );
     apiBase = `http://127.0.0.1:${await listen(api)}`;
   });
 
@@ -124,13 +126,21 @@ describeIntegration('end to end: definition to artifact download', () => {
         name: 'e2e fixture',
         url: fixtureUrl,
         config: {
-          waitFor: '#rows',
-          rowSelector: 'tr.row',
-          fields: [
-            { name: 'date', selector: 'td.date' },
-            { name: 'amount', selector: 'td.amount' },
+          steps: [
+            { op: 'goto' },
+            { op: 'waitFor', selector: '#rows' },
+            {
+              op: 'extract',
+              name: 'rows',
+              rowSelector: 'tr.row',
+              fields: [
+                { name: 'date', selector: 'td.date' },
+                { name: 'amount', selector: 'td.amount' },
+              ],
+              emit: ['JSON', 'CSV'],
+            },
+            { op: 'capture', as: ['PNG'], name: 'page' },
           ],
-          artifacts: ['JSON', 'CSV', 'PNG'],
         },
       }),
     });
@@ -165,7 +175,7 @@ describeIntegration('end to end: definition to artifact download', () => {
     const download = await fetch(`${apiBase}/artifacts/${json?.id}/download`);
     expect(download.status).toBe(200);
     expect(download.headers.get('content-type')).toContain('application/json');
-    expect(download.headers.get('content-disposition')).toContain('data.json');
+    expect(download.headers.get('content-disposition')).toContain('rows.json');
 
     const rows = JSON.parse(await download.text()) as Array<Record<string, string>>;
     expect(rows).toEqual([

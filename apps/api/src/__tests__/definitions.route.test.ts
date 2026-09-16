@@ -42,54 +42,11 @@ const storage = {} as never;
 const HERMETIC = { assertUrl: async () => {} };
 
 describe('POST /definitions config parsing', () => {
-  it('accepts a v1 config and persists the upgraded v2 step program', async () => {
-    const captured: { config?: unknown } = {};
-    const app = createServer(fakePool(captured), queue, storage, HERMETIC);
-
-    const res = await request(app)
-      .post('/definitions')
-      .send({
-        name: 'My scrape',
-        url: 'https://example.com',
-        config: {
-          waitFor: '#ready',
-          rowSelector: 'table tr',
-          fields: [
-            { name: 'title', selector: 'td.title' },
-            { name: 'href', selector: 'a', attribute: 'href' },
-          ],
-          artifacts: ['JSON', 'CSV', 'PNG'],
-        },
-      });
-
-    expect(res.status).toBe(201);
-    expect(captured.config).toEqual({
-      version: 2,
-      upgradedFrom: 1,
-      steps: [
-        { op: 'goto' },
-        { op: 'waitFor', selector: '#ready' },
-        {
-          op: 'extract',
-          name: 'rows',
-          rowSelector: 'table tr',
-          fields: [
-            { name: 'title', selector: 'td.title' },
-            { name: 'href', selector: 'a', attribute: 'href' },
-          ],
-          emit: ['JSON', 'CSV'],
-        },
-        { op: 'capture', as: ['PNG'], name: 'page' },
-      ],
-    });
-  });
-
-  it('accepts a v2 step program and persists it unchanged', async () => {
+  it('accepts a step program and persists it unchanged', async () => {
     const captured: { config?: unknown } = {};
     const app = createServer(fakePool(captured), queue, storage, HERMETIC);
 
     const config = {
-      version: 2,
       steps: [
         { op: 'goto' },
         {
@@ -122,17 +79,12 @@ describe('POST /definitions config parsing', () => {
   });
 
   it.each([
-    { desc: 'empty fields', config: { fields: [], artifacts: ['JSON'] } },
-    {
-      desc: 'bad artifact type',
-      config: { fields: [{ name: 'a', selector: 'b' }], artifacts: ['EXE'] },
-    },
-    { desc: 'missing selector', config: { fields: [{ name: 'a' }], artifacts: [] } },
+    { desc: 'no steps array', config: { fields: [{ name: 'a', selector: 'b' }] } },
     {
       desc: 'unknown step verb',
-      config: { version: 2, steps: [{ op: 'evaluate', code: 'alert(1)' }] },
+      config: { steps: [{ op: 'evaluate', code: 'alert(1)' }] },
     },
-    { desc: 'empty step program', config: { version: 2, steps: [] } },
+    { desc: 'empty step program', config: { steps: [] } },
   ])('rejects invalid config: $desc', async ({ config }) => {
     const app = createServer(fakePool({}), queue, storage, HERMETIC);
     const res = await request(app)
@@ -143,7 +95,7 @@ describe('POST /definitions config parsing', () => {
 });
 
 describe('POST /definitions URL guard', () => {
-  const config = { fields: [{ name: 'a', selector: 'b' }], artifacts: ['JSON'] };
+  const config = { steps: [{ op: 'goto' }] };
 
   it.each([
     { desc: 'a link-local address', url: 'http://169.254.169.254/' },

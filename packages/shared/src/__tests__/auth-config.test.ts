@@ -6,7 +6,7 @@ import {
 } from '../scrape-config.js';
 
 function withAuth(auth: unknown): unknown {
-  return { version: 2, auth, steps: [{ op: 'goto' }] };
+  return { auth, steps: [{ op: 'goto' }] };
 }
 
 describe('auth validation', () => {
@@ -53,7 +53,7 @@ describe('auth validation', () => {
 
 describe('collectSecretRefs', () => {
   it('returns nothing for a config that needs no secret', () => {
-    const config: ScrapeConfig = { version: 2, steps: [{ op: 'goto' }] };
+    const config: ScrapeConfig = { steps: [{ op: 'goto' }] };
     expect(collectSecretRefs(config)).toEqual([]);
   });
 
@@ -76,13 +76,12 @@ describe('collectSecretRefs', () => {
       expected: ['court_session', 'court_user', 'court_pw'],
     },
   ])('finds $desc', ({ auth, expected }) => {
-    const config = validateScrapeConfig({ version: 2, auth, steps: [{ op: 'goto' }] });
+    const config = validateScrapeConfig({ auth, steps: [{ op: 'goto' }] });
     expect(collectSecretRefs(config).sort()).toEqual([...expected].sort());
   });
 
   it('walks every nesting level of the step program', () => {
     const config = validateScrapeConfig({
-      version: 2,
       steps: [
         { op: 'fill', selector: '#top', valueFrom: 'top' },
         {
@@ -110,7 +109,6 @@ describe('collectSecretRefs', () => {
 
   it('reports each name once', () => {
     const config = validateScrapeConfig({
-      version: 2,
       steps: [
         { op: 'fill', selector: '#a', valueFrom: 'pw' },
         { op: 'fill', selector: '#b', valueFrom: 'pw' },

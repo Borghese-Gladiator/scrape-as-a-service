@@ -13,7 +13,6 @@ class FakeDb implements Queryable {
   run: ScrapeRun = {
     id: 'run-1',
     definition_id: 'def-1',
-    schedule_id: null,
     status: 'QUEUED',
     trigger: 'MANUAL',
     created_at: new Date('2026-01-01T00:00:00Z'),

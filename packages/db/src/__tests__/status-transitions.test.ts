@@ -39,9 +39,8 @@ class FakeDb implements Queryable {
       const run: ScrapeRun = {
         id: this.id('run'),
         definition_id: values[0] as string,
-        schedule_id: (values[1] as string | null) ?? null,
         status: 'QUEUED',
-        trigger: values[2] as ScrapeRun['trigger'],
+        trigger: values[1] as ScrapeRun['trigger'],
         created_at: new Date(),
         started_at: null,
         finished_at: null,
@@ -118,8 +117,7 @@ describe('run status transitions', () => {
 
   it('QUEUED -> RUNNING -> FAILED stamps finished_at', async () => {
     const db = new FakeDb();
-    const created = await createRun(db, 'def-1', 'SCHEDULE', 'sched-1');
-    expect(created.schedule_id).toBe('sched-1');
+    const created = await createRun(db, 'def-1', 'API');
 
     await updateRunStatus(db, created.id, 'RUNNING', new Date('2026-01-01T00:00:00Z'));
     const failed = await updateRunStatus(

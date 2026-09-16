@@ -3,7 +3,6 @@ export * from './types.js';
 export * from './pagination.js';
 export * from './migrate.js';
 export * from './repositories/definitions.js';
-export * from './repositories/schedules.js';
 export * from './repositories/runs.js';
 export * from './repositories/attempts.js';
 export * from './repositories/artifacts.js';

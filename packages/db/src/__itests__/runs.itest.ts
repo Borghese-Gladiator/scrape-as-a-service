@@ -1,7 +1,6 @@
 import { beforeEach, expect, it } from 'vitest';
 import { describeIntegration, useTestDb } from '../../../../test/integration/harness.js';
 import { createDefinition } from '../repositories/definitions.js';
-import { createSchedule } from '../repositories/schedules.js';
 import { insertAttempt } from '../repositories/attempts.js';
 import { insertArtifact } from '../repositories/artifacts.js';
 import {
@@ -14,8 +13,7 @@ import {
 import type { RunTrigger, ScrapeConfig } from '../types.js';
 
 const CONFIG: ScrapeConfig = {
-  fields: [{ name: 'title', selector: 'h1' }],
-  artifacts: ['JSON'],
+  steps: [{ op: 'extract', name: 'rows', fields: [{ name: 'title', selector: 'h1' }] }],
 };
 
 describeIntegration('runs repository', () => {
@@ -31,28 +29,17 @@ describeIntegration('runs repository', () => {
     definitionId = definition.id;
   });
 
-  it.each<RunTrigger>(['MANUAL', 'API', 'SCHEDULE'])(
+  it.each<RunTrigger>(['MANUAL', 'API'])(
     'creates a QUEUED run with trigger %s',
     async (trigger) => {
       const run = await createRun(pool, definitionId, trigger);
       expect(run.status).toBe('QUEUED');
       expect(run.trigger).toBe(trigger);
       expect(run.definition_id).toBe(definitionId);
-      expect(run.schedule_id).toBeNull();
       expect(run.started_at).toBeNull();
       expect(run.finished_at).toBeNull();
     },
   );
-
-  it('records the schedule id when the run comes from a schedule', async () => {
-    const schedule = await createSchedule(
-      pool,
-      { definitionId, cron: '* * * * *', timezone: 'UTC' },
-      new Date(),
-    );
-    const run = await createRun(pool, definitionId, 'SCHEDULE', schedule.id);
-    expect(run.schedule_id).toBe(schedule.id);
-  });
 
   it('sets started_at on RUNNING and finished_at on a terminal status', async () => {
     const run = await createRun(pool, definitionId, 'MANUAL');
@@ -117,9 +104,9 @@ describeIntegration('runs repository', () => {
     const theirs = await createRun(pool, other.id, 'MANUAL');
 
     const all = await listRuns(pool);
-    expect(all.map((r) => r.id).sort()).toEqual([mine.id, theirs.id].sort());
+    expect(all.items.map((r) => r.id).sort()).toEqual([mine.id, theirs.id].sort());
 
-    const filtered = await listRuns(pool, definitionId);
-    expect(filtered.map((r) => r.id)).toEqual([mine.id]);
+    const filtered = await listRuns(pool, { definitionId });
+    expect(filtered.items.map((r) => r.id)).toEqual([mine.id]);
   });
 });

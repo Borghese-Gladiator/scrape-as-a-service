@@ -104,7 +104,7 @@ describe('DefinitionForm JSON editor', () => {
     const editor = screen.getByRole('textbox', { name: 'Program JSON' });
     await user.clear(editor);
     await user.click(editor);
-    await user.paste('{"version":2,"steps":[{"op":"teleport"}]}');
+    await user.paste('{"steps":[{"op":"teleport"}]}');
     await user.tab();
 
     expect(screen.getByRole('alert')).toHaveTextContent(
@@ -152,7 +152,6 @@ describe('DefinitionForm JSON editor', () => {
     );
 
     expect(shown).toEqual({
-      version: 2,
       auth: { mode: 'storageState', secretRef: 'session-a' },
       record: true,
       steps: [

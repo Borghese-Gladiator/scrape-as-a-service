@@ -2,14 +2,13 @@ import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_LIMITS,
   LIMIT_CAPS,
-  isV1Config,
   resolveLimits,
   validateScrapeConfig,
   type Step,
 } from '../scrape-config.js';
 
 function withSteps(steps: unknown[]): unknown {
-  return { version: 2, steps };
+  return { steps };
 }
 
 const VALID_STEPS: Array<{ op: string; step: Step }> = [
@@ -71,14 +70,12 @@ const VALID_STEPS: Array<{ op: string; step: Step }> = [
 describe('validateScrapeConfig v2 accept', () => {
   it.each(VALID_STEPS)('accepts a valid $op step', ({ step }) => {
     expect(validateScrapeConfig(withSteps([step]))).toEqual({
-      version: 2,
       steps: [step],
     });
   });
 
   it('keeps auth, limits and record', () => {
     const config = validateScrapeConfig({
-      version: 2,
       auth: { mode: 'storageState', secretRef: 'courtreserve' },
       steps: [{ op: 'goto' }],
       limits: { maxPages: 5 },
@@ -91,7 +88,6 @@ describe('validateScrapeConfig v2 accept', () => {
 
   it('drops keys that the schema does not define', () => {
     const config = validateScrapeConfig({
-      version: 2,
       steps: [{ op: 'goBack', script: 'alert(1)' }],
       onLoad: 'alert(1)',
     });
@@ -161,11 +157,10 @@ describe('validateScrapeConfig v2 reject', () => {
 
   it.each([
     { desc: 'a non-object', input: 'steps' },
-    { desc: 'a wrong version', input: { version: 3, steps: [{ op: 'goBack' }] } },
-    { desc: 'an empty step list', input: { version: 2, steps: [] } },
+    { desc: 'an empty step list', input: { steps: [] } },
     {
       desc: 'an unknown auth mode',
-      input: { version: 2, steps: [{ op: 'goBack' }], auth: { mode: 'oauth' } },
+      input: { steps: [{ op: 'goBack' }], auth: { mode: 'oauth' } },
     },
   ])('rejects $desc', ({ input }) => {
     expect(() => validateScrapeConfig(input)).toThrow();
@@ -180,7 +175,6 @@ describe('limits', () => {
     ['maxArtifacts' as const],
   ])('clamps %s to its hard cap', (key) => {
     const config = validateScrapeConfig({
-      version: 2,
       steps: [{ op: 'goBack' }],
       limits: { [key]: LIMIT_CAPS[key] * 10 },
     });
@@ -190,7 +184,6 @@ describe('limits', () => {
   it('rejects a non-positive limit', () => {
     expect(() =>
       validateScrapeConfig({
-        version: 2,
         steps: [{ op: 'goBack' }],
         limits: { maxPages: 0 },
       }),
@@ -200,19 +193,5 @@ describe('limits', () => {
   it('fills missing limits from the defaults', () => {
     expect(resolveLimits(undefined)).toEqual(DEFAULT_LIMITS);
     expect(resolveLimits({ maxPages: 3 })).toEqual({ ...DEFAULT_LIMITS, maxPages: 3 });
-  });
-});
-
-describe('isV1Config', () => {
-  it.each([
-    {
-      desc: 'a config with no version',
-      input: { fields: [], artifacts: [] },
-      expected: true,
-    },
-    { desc: 'a v2 config', input: { version: 2, steps: [] }, expected: false },
-    { desc: 'a non-object', input: 'x', expected: false },
-  ])('returns $expected for $desc', ({ input, expected }) => {
-    expect(isV1Config(input)).toBe(expected);
   });
 });

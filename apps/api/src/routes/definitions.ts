@@ -9,8 +9,9 @@ import {
   type UpdateDefinitionInput,
 } from '@scraper/db';
 import { assertSafeUrl, validateScrapeConfig } from '@scraper/shared';
-import { asyncHandler, HttpError } from '../http.js';
+import { asyncHandler, HttpError, parseBody } from '../http.js';
 import { pageQuery } from '../query.js';
+import { CreateDefinitionBody, UpdateDefinitionBody } from '../schemas.js';
 
 function parseConfig(input: unknown) {
   try {
@@ -57,18 +58,14 @@ export function definitionsRouter(
   router.post(
     '/',
     asyncHandler(async (req, res) => {
-      const body = req.body as Record<string, unknown>;
-      const name = body?.name;
-      const url = body?.url;
-      if (typeof name !== 'string' || name.length === 0) {
-        throw new HttpError(400, 'name is required');
-      }
-      if (typeof url !== 'string' || url.length === 0) {
-        throw new HttpError(400, 'url is required');
-      }
-      await checkUrl(url);
-      const config = parseConfig(body?.config);
-      const definition = await createDefinition(pool, { name, url, config });
+      const body = parseBody(CreateDefinitionBody, req.body);
+      await checkUrl(body.url);
+      const config = parseConfig(body.config);
+      const definition = await createDefinition(pool, {
+        name: body.name,
+        url: body.url,
+        config,
+      });
       if (!definition) {
         throw new HttpError(500, 'failed to create the definition');
       }
@@ -79,28 +76,15 @@ export function definitionsRouter(
   router.put(
     '/:id',
     asyncHandler(async (req, res) => {
-      const body = (req.body ?? {}) as Record<string, unknown>;
+      const body = parseBody(UpdateDefinitionBody, req.body);
       const input: UpdateDefinitionInput = {};
 
-      if (body.name !== undefined) {
-        if (typeof body.name !== 'string' || body.name.length === 0) {
-          throw new HttpError(400, 'name must be a non-empty string');
-        }
-        input.name = body.name;
-      }
+      if (body.name !== undefined) input.name = body.name;
       if (body.url !== undefined) {
-        if (typeof body.url !== 'string' || body.url.length === 0) {
-          throw new HttpError(400, 'url must be a non-empty string');
-        }
         await checkUrl(body.url);
         input.url = body.url;
       }
-      if (body.config !== undefined) {
-        input.config = parseConfig(body.config);
-      }
-      if (Object.keys(input).length === 0) {
-        throw new HttpError(400, 'one of name, url and config is required');
-      }
+      if (body.config !== undefined) input.config = parseConfig(body.config);
 
       const definition = await updateDefinition(pool, req.params.id ?? '', input);
       if (!definition) {

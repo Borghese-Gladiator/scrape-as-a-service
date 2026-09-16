@@ -22,7 +22,6 @@
     "_note": "These two values are copied into the two fill steps below. Change both places."
   },
   "config": {
-    "version": 2,
     "auth": { "mode": "cdp", "endpointUrl": "http://localhost:9222" },
     "limits": {
       "maxDurationMs": 900000,

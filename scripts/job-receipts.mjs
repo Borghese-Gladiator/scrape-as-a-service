@@ -8,8 +8,8 @@
 // a PNG and a PDF of every receipt into the output folder. It needs no
 // Postgres, no Redis and no MinIO.
 //
-// Read docs/RECEIPTS.md before the first run. The selectors in the definition
-// are unverified Kendo defaults until `npm run discover` confirms them.
+// The selectors in the definition are unverified Kendo defaults until
+// `npm run discover` confirms them.
 
 import { createRequire } from 'node:module';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -201,8 +201,7 @@ same session and compare:
     auth.mode === 'cdp' ? `--cdp ${auth.endpointUrl}` : '--profile'
   }
 
-Then edit ${definitionPath} with the selectors the report names.
-docs/RECEIPTS.md walks through it.`);
+Then edit ${definitionPath} with the selectors the report names.`);
     }
     return 1;
   } finally {

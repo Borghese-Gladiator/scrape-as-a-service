@@ -3,7 +3,6 @@ import { isAbsolute, join, resolve } from 'node:path';
 import type { Browser } from 'playwright';
 import type { ScrapeConfig } from '@scraper/shared';
 import { assertSafeUrl, validateScrapeConfig } from '@scraper/shared';
-import { artifactFilename } from '../artifacts.js';
 import { StepError } from '../interpreter.js';
 import {
   closeScrapeSession,
@@ -147,7 +146,7 @@ export async function runLocal(
   try {
     const result = await runScrape(session, url, config, { assertUrl });
     for (const artifact of result.artifacts) {
-      const name = artifactFilename(config, artifact.name);
+      const name = artifact.name;
       await writeFile(join(outDir, name), artifact.body);
       files.push({ name, type: artifact.type, bytes: artifact.body.length });
       log(`  ${artifact.type.padEnd(4)} ${name} (${artifact.body.length} bytes)`);

@@ -11,20 +11,18 @@ import type {
 import { listAttempts } from './attempts.js';
 import { listArtifacts } from './artifacts.js';
 
-const COLUMNS =
-  'id, definition_id, schedule_id, status, trigger, created_at, started_at, finished_at';
+const COLUMNS = 'id, definition_id, status, trigger, created_at, started_at, finished_at';
 
 export async function createRun(
   db: Queryable,
   definitionId: string,
   trigger: RunTrigger,
-  scheduleId: string | null = null,
 ): Promise<ScrapeRun | null> {
   const { rows } = await db.query<ScrapeRun>(
-    `INSERT INTO scrape_runs (definition_id, schedule_id, status, trigger)
-     VALUES ($1, $2, 'QUEUED', $3)
+    `INSERT INTO scrape_runs (definition_id, status, trigger)
+     VALUES ($1, 'QUEUED', $2)
      RETURNING ${COLUMNS}`,
-    [definitionId, scheduleId, trigger],
+    [definitionId, trigger],
   );
   return rows[0] ?? null;
 }

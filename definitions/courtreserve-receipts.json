@@ -32,7 +32,6 @@
     "_note": "A copy of the live values, for reading. The steps below are what runs."
   },
   "config": {
-    "version": 2,
     "auth": { "mode": "cdp", "endpointUrl": "http://localhost:9222" },
     "limits": {
       "maxDurationMs": 900000,
