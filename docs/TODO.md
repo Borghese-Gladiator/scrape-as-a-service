@@ -450,3 +450,20 @@ The README does not say so.
 4. **Close the open door**: 3.1, 3.2.
 5. **Prove it works**: 6.1, 6.2, 6.4.
 6. Everything else.
+
+---
+
+## Appendix: notes from the earlier Python prototype
+
+An earlier prototype used Python, FastAPI, and Selenium. It is gone from
+the working tree, but it is still in the git history. It left these
+lessons:
+
+- An XPath search that starts with `//` searches the whole document.
+  Start it with `.//` to search only the children of the current node.
+- A trailing comma turns a Python value into a one-item tuple, for
+  example `x = "abc",`.
+- A separate scraper class per website did not scale. Each one broke
+  often and needed its own fix.
+- RQ could not run instance methods, and could not reuse one browser
+  session across jobs. This need led to a custom Redis queue instead.
